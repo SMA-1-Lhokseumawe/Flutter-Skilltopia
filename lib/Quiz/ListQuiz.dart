@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class ListQuiz extends StatefulWidget {
-  const ListQuiz({super.key});
+  final String uuid;
+  final String accessToken;
+
+  const ListQuiz({
+    Key? key, 
+    required this.uuid,
+    required this.accessToken,
+  }) : super(key: key);
 
   @override
   State<ListQuiz> createState() => _ListQuizState();

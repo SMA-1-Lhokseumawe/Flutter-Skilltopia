@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class TipsAndTrick extends StatefulWidget {
-  const TipsAndTrick({super.key});
+  final String uuid;
+  final String? accessToken;
+
+  const TipsAndTrick({
+    Key? key, 
+    required this.uuid,
+    required this.accessToken,
+  }) : super(key: key);
 
   @override
   State createState() => _TipsAndTrickState();

@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import 'HasilKuesioner.dart';
 
 class Kuesioner extends StatefulWidget {
-  const Kuesioner({super.key});
+  final String uuid;
+  final String accessToken;
+
+  const Kuesioner({
+    Key? key, 
+    required this.uuid,
+    required this.accessToken,
+  }) : super(key: key);
 
   @override
   State<Kuesioner> createState() => _KuesionerState();

@@ -2,23 +2,109 @@ import 'package:flutter/material.dart';
 import 'package:skilltopia/Profile/AboutAplikasi.dart';
 import 'package:skilltopia/Profile/EditProfile.dart';
 import 'package:skilltopia/Profile/GantiPassword.dart';
+import 'package:skilltopia/constants.dart';
 import 'package:skilltopia/loginPage.dart';
 
+import 'package:skilltopia/repository.dart';
+
 class Profile extends StatefulWidget {
-  const Profile({super.key});
+  final String uuid;
+  final String accessToken;
+
+  const Profile({Key? key, required this.uuid, required this.accessToken}) : super(key: key);
 
   @override
   State<Profile> createState() => _ProfileState();
 }
 
 class _ProfileState extends State<Profile> {
-  // Sample user data - replace with your actual data source
-  final String userName = 'Irvan';
-  final String userEmail = 'irvan@example.com';
-  final String learningStyle = 'Visual'; // Kinestetik/Auditori/Visual
+  String nama = '';
+  String email = '';
+  String gayaBelajar = '';
+  String image = '';
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final repository = UserRepository();
+      final response = await repository.getProfile(widget.accessToken!);
+
+      if (response['status']) {
+        final data = response['data'];
+        setState(() {
+          nama = data['nama'] ?? '';
+          gayaBelajar = data['gayaBelajar'] ?? '';
+          email = data['email'] ?? '';
+          image = data['image'] ?? '';
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response?['message'] ?? 'Error fetching profile'),
+          ),
+        );
+      }
+    } catch (error) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error fetching profile: $error")));
+    }
+  }
+
+  void _logout(BuildContext context) async {
+    if (widget.accessToken == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Token tidak ditemukan, Anda belum login")),
+      );
+      return;
+    }
+
+    final repository = UserRepository();
+
+    try {
+      final success = await repository.logoutUser(widget.accessToken!);
+
+      if (success) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Berhasil logout")));
+
+        // Redirect ke LoginPage setelah logout
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const loginPage()),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal logout")));
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $error")));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -124,8 +210,8 @@ class _ProfileState extends State<Profile> {
                           radius: 50,
                           backgroundColor: const Color(0xFF27DEBF),
                           child: ClipOval(
-                            child: Image.asset(
-                              'assets/logo.png',
+                            child: Image.network(
+                              '${AppConstants.baseUrlImage}${image}',
                               width: 100,
                               height: 100,
                               fit: BoxFit.cover,
@@ -143,7 +229,7 @@ class _ProfileState extends State<Profile> {
 
                       // User Name
                       Text(
-                        userName,
+                        nama,
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -154,7 +240,7 @@ class _ProfileState extends State<Profile> {
 
                       // User Email
                       Text(
-                        userEmail,
+                        email,
                         style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 12),
@@ -183,7 +269,7 @@ class _ProfileState extends State<Profile> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Gaya Belajar: $learningStyle',
+                              'Gaya Belajar: ${gayaBelajar}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -283,14 +369,8 @@ class _ProfileState extends State<Profile> {
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => loginPage(),
-                                ),
-                              );
-                              },
+                              onPressed: () => _logout(context),
+                              child: Text("Logout"),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFE94560),
                                 foregroundColor: Colors.white,
@@ -302,20 +382,7 @@ class _ProfileState extends State<Profile> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.exit_to_app_rounded),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Keluar',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              
                             ),
                           ),
                         ],

@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:skilltopia/Materi/ListSubModul.dart';
 
 class ListModul extends StatefulWidget {
-  const ListModul({super.key});
+  final String uuid;
+  final String accessToken;
+
+  const ListModul({
+    Key? key, 
+    required this.uuid,
+    required this.accessToken,
+  }) : super(key: key);
 
   @override
   State<ListModul> createState() => _ListModulState();

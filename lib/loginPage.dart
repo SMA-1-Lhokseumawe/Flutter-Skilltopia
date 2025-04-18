@@ -1,9 +1,9 @@
-// ignore_for_file: unused_import, prefer_const_constructors, prefer_const_literals_to_create_immutables, use_super_parameters
-
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
 import 'lupaPassword.dart';
 import 'package:skilltopia/Beranda/beranda.dart';
+import 'package:skilltopia/repository.dart'; // Import repository untuk login
+import 'package:skilltopia/models.dart';
 
 class loginPage extends StatefulWidget {
   const loginPage({Key? key}) : super(key: key);
@@ -13,17 +13,88 @@ class loginPage extends StatefulWidget {
 }
 
 class _loginPageState extends State<loginPage> {
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final UserRepository _repository = UserRepository();
 
   bool _isObscure = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // Basic validation
+    if (username.isEmpty || password.isEmpty) {
+      _showErrorMessage('Username and password cannot be empty');
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      print("username: $username, Password: $password"); // Logging request
+      final response = await _repository.loginUser(username, password);
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        print("Response Status: ${response.status}");
+        print("Response Message: ${response.message}");
+
+        if (response.status) {
+          
+          final uuid = response.uuid ?? '';
+          final accessToken = response.accessToken ?? '';
+
+          Navigator.pushReplacement(
+            context,
+            PageTransition(
+              type: PageTransitionType.fade,
+              duration: Duration(milliseconds: 300),
+              child: Beranda(
+                uuid: uuid,
+                accessToken: accessToken,
+              ),
+            ),
+          );
+        } else {
+          _showErrorMessage(response.message);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        print("Error: $e");  // Logging error message
+        _showErrorMessage('Login failed: ${e.toString()}');
+      }
+    }
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -83,7 +154,7 @@ class _loginPageState extends State<loginPage> {
                             ),
                             SizedBox(height: 8),
                             Text(
-                              'Sign in with your email',
+                              'Sign in with your username',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -137,7 +208,7 @@ class _loginPageState extends State<loginPage> {
 
                       SizedBox(height: 30),
 
-                      // Email Field
+                      // Username Field
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.grey.withOpacity(0.1),
@@ -149,13 +220,13 @@ class _loginPageState extends State<loginPage> {
                             vertical: 5,
                           ),
                           child: TextField(
-                            controller: _emailController,
+                            controller: _usernameController,
                             decoration: InputDecoration(
                               border: InputBorder.none,
-                              hintText: 'Email',
+                              hintText: 'Username',
                               hintStyle: TextStyle(color: Colors.grey),
                               icon: Icon(
-                                Icons.email_outlined,
+                                Icons.account_circle_outlined,
                                 color: Color(0xFF27DEBF),
                               ),
                             ),
@@ -237,27 +308,7 @@ class _loginPageState extends State<loginPage> {
 
                       // Login Button with teal color
                       GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _isLoading = true;
-                          });
-
-                            if (mounted) {
-                              setState(() {
-                                _isLoading = false;
-                              });
-
-                              // Navigate to Beranda with smooth transition
-                              Navigator.pushReplacement(
-                                context,
-                                PageTransition(
-                                  type: PageTransitionType.fade,
-                                  duration: Duration(milliseconds: 300),
-                                  child: Beranda(),
-                                ),
-                              );
-                            }
-                        },
+                        onTap: _isLoading ? null : _login, // Call _login method when button is tapped
                         child: Container(
                           width: double.infinity,
                           padding: EdgeInsets.symmetric(vertical: 16),
@@ -273,28 +324,26 @@ class _loginPageState extends State<loginPage> {
                             ],
                           ),
                           child: Center(
-                            child:
-                                _isLoading
-                                    ? SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                      ),
-                                    )
-                                    : Text(
-                                      'LOGIN',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.5,
+                            child: _isLoading
+                                ? SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
                                       ),
                                     ),
+                                  )
+                                : Text(
+                                    'LOGIN',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
