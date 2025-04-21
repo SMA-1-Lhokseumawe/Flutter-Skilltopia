@@ -41,7 +41,7 @@ class _BerandaState extends State<Beranda> {
       ),
       NilaiSaya(uuid: widget.uuid, accessToken: widget.accessToken),
       Notifikasi(uuid: widget.uuid, accessToken: widget.accessToken),
-      Profile(uuid: widget.uuid, accessToken: widget.accessToken),
+      ProfilePage(uuid: widget.uuid, accessToken: widget.accessToken),
     ];
   }
 

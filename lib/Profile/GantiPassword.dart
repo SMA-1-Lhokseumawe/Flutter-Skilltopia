@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:skilltopia/repository.dart';
 
 class GantiPassword extends StatefulWidget {
-  const GantiPassword({super.key});
+  final String uuid;
+  final String accessToken;
+
+  const GantiPassword({Key? key, required this.uuid, required this.accessToken})
+    : super(key: key);
 
   @override
   State<GantiPassword> createState() => _GantiPasswordState();
@@ -10,23 +15,71 @@ class GantiPassword extends StatefulWidget {
 class _GantiPasswordState extends State<GantiPassword> {
   // Form key for validation
   final _formKey = GlobalKey<FormState>();
-  
+
   // Text editing controllers
   final TextEditingController _oldPasswordController = TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-  
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
   // Password visibility toggle
   bool _obscureOldPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
-  
+
+  bool _isSubmitting = false;
+  String _message = '';
+  bool _isError = false;
+
   @override
   void dispose() {
     _oldPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _changePassword() async {
+    if (_formKey.currentState!.validate()) {
+      // Periksa apakah ada field yang kosong
+      if (_oldPasswordController.text.isEmpty ||
+          _newPasswordController.text.isEmpty ||
+          _confirmPasswordController.text.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Semua field harus diisi')));
+        return;
+      }
+
+      setState(() {
+        _isSubmitting = true;
+      });
+
+      final userRepository = UserRepository();
+      final response = await userRepository.updatePassword(
+        widget.accessToken,
+        _oldPasswordController.text,
+        _newPasswordController.text,
+        _confirmPasswordController.text,
+      );
+
+      setState(() {
+        _isSubmitting = false;
+        _message = response['message'];
+        _isError = !response['status'];
+      });
+
+      if (!_isError) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Password berhasil diperbarui')));
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message)));
+      }
+    }
   }
 
   @override
@@ -68,15 +121,7 @@ class _GantiPasswordState extends State<GantiPassword> {
                 ),
                 child: const Icon(Icons.check, color: Color(0xFF27DEBF)),
               ),
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  // Save password changes
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Password berhasil diperbarui')),
-                  );
-                  Navigator.of(context).pop();
-                }
-              },
+              onPressed: _changePassword,
             ),
           ),
         ],
@@ -190,7 +235,10 @@ class _GantiPasswordState extends State<GantiPassword> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Old Password Field
-                          _buildLabelWithIcon(Icons.lock_outline_rounded, 'Password Lama'),
+                          _buildLabelWithIcon(
+                            Icons.lock_outline_rounded,
+                            'Password Lama',
+                          ),
                           _buildPasswordField(
                             controller: _oldPasswordController,
                             hintText: 'Masukkan password lama Anda',
@@ -201,6 +249,7 @@ class _GantiPasswordState extends State<GantiPassword> {
                               });
                             },
                             validator: (value) {
+                              print("Old Password: $value");
                               if (value == null || value.isEmpty) {
                                 return 'Password lama tidak boleh kosong';
                               }
@@ -210,7 +259,10 @@ class _GantiPasswordState extends State<GantiPassword> {
                           const SizedBox(height: 20),
 
                           // New Password Field
-                          _buildLabelWithIcon(Icons.lock_rounded, 'Password Baru'),
+                          _buildLabelWithIcon(
+                            Icons.lock_rounded,
+                            'Password Baru',
+                          ),
                           _buildPasswordField(
                             controller: _newPasswordController,
                             hintText: 'Masukkan password baru Anda',
@@ -221,6 +273,7 @@ class _GantiPasswordState extends State<GantiPassword> {
                               });
                             },
                             validator: (value) {
+                              print("New Password: $value");
                               if (value == null || value.isEmpty) {
                                 return 'Password baru tidak boleh kosong';
                               } else if (value.length < 6) {
@@ -234,17 +287,22 @@ class _GantiPasswordState extends State<GantiPassword> {
                           const SizedBox(height: 20),
 
                           // Confirm Password Field
-                          _buildLabelWithIcon(Icons.lock_person_rounded, 'Konfirmasi Password'),
+                          _buildLabelWithIcon(
+                            Icons.lock_person_rounded,
+                            'Konfirmasi Password',
+                          ),
                           _buildPasswordField(
                             controller: _confirmPasswordController,
                             hintText: 'Konfirmasi password baru Anda',
                             obscureText: _obscureConfirmPassword,
                             onToggleVisibility: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                             validator: (value) {
+                              print("Confirm Password: $value");
                               if (value == null || value.isEmpty) {
                                 return 'Konfirmasi password tidak boleh kosong';
                               } else if (value != _newPasswordController.text) {
@@ -257,7 +315,10 @@ class _GantiPasswordState extends State<GantiPassword> {
 
                           // Password Requirements
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8.0,
+                              horizontal: 4.0,
+                            ),
                             child: Text(
                               'Password harus memiliki minimal 6 karakter',
                               style: TextStyle(
@@ -276,14 +337,7 @@ class _GantiPasswordState extends State<GantiPassword> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Password berhasil diperbarui')),
-                            );
-                            Navigator.of(context).pop();
-                          }
-                        },
+                        onPressed: _changePassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF27DEBF),
                           foregroundColor: Colors.white,
@@ -347,13 +401,13 @@ class _GantiPasswordState extends State<GantiPassword> {
       obscureText: obscureText,
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(
-          color: Colors.grey[400],
-          fontSize: 16,
-        ),
+        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
         filled: true,
         fillColor: Colors.grey[100],
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -382,10 +436,7 @@ class _GantiPasswordState extends State<GantiPassword> {
           onPressed: onToggleVisibility,
         ),
       ),
-      style: TextStyle(
-        fontSize: 16,
-        color: Colors.grey[800],
-      ),
+      style: TextStyle(fontSize: 16, color: Colors.grey[800]),
       validator: validator,
     );
   }

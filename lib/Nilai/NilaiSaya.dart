@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:skilltopia/repository.dart';
-import 'package:skilltopia/models.dart'; // Pastikan NilaiSaya model sudah diperbarui
+import 'package:skilltopia/models.dart';
 import 'package:intl/intl.dart';
 
 // Fungsi untuk format tanggal
@@ -9,10 +9,8 @@ String formatDate(String? dateTimeString) {
     return "Unknown";
   }
 
-  // Parse the date string into DateTime
-  DateTime dateTime = DateTime.parse(dateTimeString);
+  DateTime dateTime = DateTime.parse(dateTimeString).toLocal(); // Mengubah ke zona waktu lokal
 
-  // Format tanggal dengan format yyyy-MM-dd
   return DateFormat('yyyy-MM-dd').format(dateTime);
 }
 
@@ -23,7 +21,7 @@ String formatTime(String? dateTimeString) {
   }
 
   // Parse the date string into DateTime
-  DateTime dateTime = DateTime.parse(dateTimeString);
+  DateTime dateTime = DateTime.parse(dateTimeString).toLocal(); // Mengubah ke zona waktu lokal
 
   // Format waktu dengan format HH:mm:ss
   return DateFormat('HH:mm:ss').format(dateTime);

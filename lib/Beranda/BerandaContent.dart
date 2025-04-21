@@ -23,6 +23,7 @@ class BerandaContent extends StatefulWidget {
 class _BerandaContentState extends State<BerandaContent> {
   String nama = '';
   String image = '';
+  String gayaBelajar = '';
   bool isLoading = true;
 
   @override
@@ -41,6 +42,7 @@ class _BerandaContentState extends State<BerandaContent> {
         setState(() {
           nama = data['nama'] ?? '';
           image = data['image'] ?? '';
+          gayaBelajar = data['gayaBelajar'] ?? '';
           isLoading = false;
         });
       } else {
@@ -310,6 +312,7 @@ class _BerandaContentState extends State<BerandaContent> {
                                   (context) => ListModul(
                                     uuid: widget.uuid,
                                     accessToken: widget.accessToken,
+                                    gayaBelajar: gayaBelajar
                                   ),
                             ),
                           );

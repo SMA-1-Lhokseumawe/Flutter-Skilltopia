@@ -1,47 +1,57 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:skilltopia/Profile/Profile.dart';
+import 'package:skilltopia/constants.dart';
+import 'package:skilltopia/models.dart';
+import 'package:skilltopia/repository.dart';
 
 class EditProfile extends StatefulWidget {
-  const EditProfile({super.key});
+  final String uuid;
+  final String accessToken;
+
+  const EditProfile({Key? key, required this.uuid, required this.accessToken})
+    : super(key: key);
 
   @override
   State<EditProfile> createState() => _EditProfileState();
 }
 
 class _EditProfileState extends State<EditProfile> {
-  // Form key for validation
+  int? id;
+  String nis = '';
+  String? nama = '';
+  String? email = '';
+  String? kelas = '';
+  String umur = '';
+  String? alamat = '';
+  String? image = '';
+  bool isLoading = true;
+
   final _formKey = GlobalKey<FormState>();
-  
-  // Text editing controllers
-  final TextEditingController _nisController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  
-  // Selected class value
+  final _nisController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _addressController = TextEditingController();
+
   String? _selectedClass;
-  
-  // List of classes for dropdown
-  final List<String> _classes = ['Kelas 10', 'Kelas 11', 'Kelas 12'];
-  
-  // Profile image
+  bool _isSubmitting = false;
+  List<dynamic> kelasList = [];
+
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
-  
+
   @override
   void initState() {
     super.initState();
-    // Initialize with existing user data
-    _nisController.text = '1234567890';
-    _nameController.text = 'Irvan';
-    _emailController.text = 'irvan@example.com';
-    _selectedClass = 'Kelas 11';
-    _ageController.text = '16';
-    _addressController.text = 'Jl. Pendidikan No. 123, Jakarta';
+    _fetchProfile();
+    _fetchKelas();
   }
-  
+
   @override
   void dispose() {
     _nisController.dispose();
@@ -51,20 +61,175 @@ class _EditProfileState extends State<EditProfile> {
     _addressController.dispose();
     super.dispose();
   }
-  
-  // Function to pick image from gallery
+
+  bool _isImagePickerActive = false;
+
   Future<void> _pickImage() async {
+    if (_isImagePickerActive) return; // If the picker is active, do nothing.
+
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      setState(() {
+        _isImagePickerActive =
+            true; // Set the flag to true when picker is triggered
+      });
+
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+      );
+
       if (pickedFile != null) {
         setState(() {
           _imageFile = File(pickedFile.path);
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    } finally {
+      setState(() {
+        _isImagePickerActive =
+            false; // Reset the flag after the image picker is done
+      });
+    }
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/profile-siswa'),
+        headers: {'Authorization': 'Bearer ${widget.accessToken}'},
       );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Decode the response
+        final data = jsonDecode(response.body);
+
+        // Access the 'data' field from the response JSON
+        final profileData = data['data'];
+
+        // Parse the profile data into your model
+        final profile = Profile.fromJson(profileData);
+
+        setState(() {
+          // Update the form with the fetched profile data
+          id = profile.id;
+          _nisController.text = profile.nis.toString();
+          _nameController.text = profile.nama!;
+          _emailController.text = profile.email!;
+          _ageController.text = profile.umur.toString();
+          _addressController.text = profile.alamat!;
+          _selectedClass = profile.kelas?.id.toString();
+          image = profile.image;
+        });
+      } else {
+        // Handle non-200 status codes, such as 400, 404
+        print(
+          'Error: Failed to load profile. Status Code: ${response.statusCode}',
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching profile')));
+      }
+    } catch (e) {
+      print("Error fetching profile: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error fetching profile: $e')));
+    }
+  }
+
+  // Fetch class list
+  Future<void> _fetchKelas() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/all-kelas'),
+        headers: {'Authorization': 'Bearer ${widget.accessToken}'},
+      );
+      final data = jsonDecode(response.body);
+      setState(() {
+        kelasList = data;
+      });
+    } catch (e) {
+      print("Error fetching classes: $e");
+    }
+  }
+
+  // Create saveProfile function
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final formData = {
+      'nis': _nisController.text,
+      'nama': _nameController.text,
+      'email': _emailController.text,
+      'kelasId': _selectedClass,
+      'umur': _ageController.text,
+      'alamat': _addressController.text,
+    };
+
+    if (_imageFile != null) {
+      formData['file'] = _imageFile!.path; // Use the file's path as a string
+    }
+
+    try {
+      final request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('${AppConstants.baseUrl}/siswa/$id'),
+      );
+
+      request.headers['Authorization'] = 'Bearer ${widget.accessToken}';
+
+      formData.forEach((key, value) {
+        request.fields[key] = value.toString();
+      });
+
+      if (_imageFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('file', _imageFile!.path),
+        );
+      }
+
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Profile Updated')));
+        Navigator.pop(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => ProfilePage(
+                  uuid: widget.uuid,
+                  accessToken: widget.accessToken,
+                ),
+          ),
+        );
+      } else {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating profile')));
+      }
+    } catch (e) {
+      setState(() {
+        _isSubmitting = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -107,22 +272,13 @@ class _EditProfileState extends State<EditProfile> {
                 ),
                 child: const Icon(Icons.check, color: Color(0xFF27DEBF)),
               ),
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  // Save profile changes
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profil berhasil diperbarui')),
-                  );
-                  Navigator.of(context).pop();
-                }
-              },
+              onPressed: _updateProfile, // Call saveProfile here
             ),
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Background curved shapes
           Positioned(
             top: -120,
             right: -60,
@@ -147,8 +303,6 @@ class _EditProfileState extends State<EditProfile> {
               ),
             ),
           ),
-
-          // Main content
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -180,15 +334,28 @@ class _EditProfileState extends State<EditProfile> {
                                         offset: const Offset(0, 3),
                                       ),
                                     ],
-                                    image: _imageFile != null
-                                        ? DecorationImage(
-                                            image: FileImage(_imageFile!),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : const DecorationImage(
-                                            image: AssetImage('assets/logo.png'),
-                                            fit: BoxFit.cover,
-                                          ),
+                                    image:
+                                        _imageFile != null
+                                            ? DecorationImage(
+                                              image: FileImage(_imageFile!),
+                                              fit: BoxFit.cover,
+                                            )
+                                            : image != null && image!.isNotEmpty
+                                            ? DecorationImage(
+                                              image: NetworkImage(
+                                                // Check if the image already contains a URL prefix
+                                                image!.startsWith('http')
+                                                    ? image! // Use it as is if it's already a full URL
+                                                    : '${AppConstants.baseUrlImage}$image', // Append base URL if not
+                                              ),
+                                              fit: BoxFit.cover,
+                                            )
+                                            : const DecorationImage(
+                                              image: AssetImage(
+                                                'assets/logo.png',
+                                              ),
+                                              fit: BoxFit.cover,
+                                            ),
                                   ),
                                 ),
                                 Positioned(
@@ -230,7 +397,6 @@ class _EditProfileState extends State<EditProfile> {
                       ),
                     ),
                     const SizedBox(height: 28),
-
                     // Form Fields Section
                     Container(
                       decoration: BoxDecoration(
@@ -267,9 +433,11 @@ class _EditProfileState extends State<EditProfile> {
                             },
                           ),
                           const SizedBox(height: 20),
-
                           // Name Field
-                          _buildLabelWithIcon(Icons.person_rounded, 'Nama Lengkap'),
+                          _buildLabelWithIcon(
+                            Icons.person_rounded,
+                            'Nama Lengkap',
+                          ),
                           _buildTextField(
                             controller: _nameController,
                             hintText: 'Masukkan nama lengkap Anda',
@@ -281,7 +449,6 @@ class _EditProfileState extends State<EditProfile> {
                             },
                           ),
                           const SizedBox(height: 20),
-
                           // Email Field
                           _buildLabelWithIcon(Icons.email_rounded, 'Email'),
                           _buildTextField(
@@ -291,47 +458,56 @@ class _EditProfileState extends State<EditProfile> {
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Email tidak boleh kosong';
-                              } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                              } else if (!RegExp(
+                                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                              ).hasMatch(value)) {
                                 return 'Email tidak valid';
                               }
                               return null;
                             },
                           ),
                           const SizedBox(height: 20),
-
                           // Class Selection Field
-                          _buildLabelWithIcon(Icons.class_rounded, 'Pilih Kelas Anda'),
+                          _buildLabelWithIcon(
+                            Icons.class_rounded,
+                            'Pilih Kelas Anda',
+                          ),
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.grey[300]!),
+                              border: Border.all(color: Colors.grey[300]!),
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: DropdownButtonFormField<String>(
                               value: _selectedClass,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(vertical: 16),
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                               ),
                               icon: const Icon(
                                 Icons.arrow_drop_down_rounded,
                                 color: Colors.grey,
                               ),
-                              style: TextStyle(fontSize: 16, color: Colors.grey[800]),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[800],
+                              ),
                               dropdownColor: Colors.white,
                               isExpanded: true,
                               hint: const Text('Pilih kelas Anda'),
-                              items: _classes.map((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
+                              items:
+                                  kelasList.map((kelas) {
+                                    return DropdownMenuItem<String>(
+                                      value: kelas['id'].toString(),
+                                      child: Text(kelas['namaKelas']),
+                                    );
+                                  }).toList(),
+                              onChanged: (value) {
                                 setState(() {
-                                  _selectedClass = newValue;
+                                  _selectedClass = value;
                                 });
                               },
                               validator: (value) {
@@ -343,9 +519,11 @@ class _EditProfileState extends State<EditProfile> {
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           // Age Field
-                          _buildLabelWithIcon(Icons.calendar_today_rounded, 'Umur'),
+                          _buildLabelWithIcon(
+                            Icons.calendar_today_rounded,
+                            'Umur',
+                          ),
                           _buildTextField(
                             controller: _ageController,
                             hintText: 'Masukkan umur Anda',
@@ -360,7 +538,6 @@ class _EditProfileState extends State<EditProfile> {
                             },
                           ),
                           const SizedBox(height: 20),
-
                           // Address Field
                           _buildLabelWithIcon(Icons.home_rounded, 'Alamat'),
                           _buildTextField(
@@ -378,19 +555,11 @@ class _EditProfileState extends State<EditProfile> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
                     // Save Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Profil berhasil diperbarui')),
-                            );
-                            Navigator.of(context).pop();
-                          }
-                        },
+                        onPressed: _updateProfile, // Call saveProfile here
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF27DEBF),
                           foregroundColor: Colors.white,
@@ -455,13 +624,13 @@ class _EditProfileState extends State<EditProfile> {
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(
-          color: Colors.grey[400],
-          fontSize: 16,
-        ),
+        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
         filled: true,
         fillColor: Colors.grey[100],
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -483,10 +652,7 @@ class _EditProfileState extends State<EditProfile> {
           borderSide: const BorderSide(color: Colors.red, width: 1.5),
         ),
       ),
-      style: TextStyle(
-        fontSize: 16,
-        color: Colors.grey[800],
-      ),
+      style: TextStyle(fontSize: 16, color: Colors.grey[800]),
       validator: validator,
     );
   }

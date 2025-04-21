@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 class User {
   final String? id;
   final String? username;
@@ -8,7 +10,7 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['uuid'],  // Sesuaikan dengan kunci yang ada di respons
+      id: json['uuid'], // Sesuaikan dengan kunci yang ada di respons
       username: json['username'],
       email: json['email'],
       role: json['role'],
@@ -19,7 +21,6 @@ class User {
     return {'id': id, 'username': username, 'email': email, 'role': role};
   }
 }
-
 
 class LoginResponse {
   final bool status;
@@ -38,38 +39,20 @@ class LoginResponse {
 
   // Factory untuk membuat LoginResponse dari JSON
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
-  return LoginResponse(
-    status: true,  // Karena server tidak mengembalikan status, set default ke true
-    message: 'Login successful',  // Anda bisa mengganti ini sesuai kebutuhan
-    user: User.fromJson(json),  // Langsung menggunakan json untuk User
-    accessToken: json['accessToken'],  // Ambil accessToken langsung dari response
-    uuid: json['uuid'],  // Ambil uuid langsung dari response
-  );
-}
+    return LoginResponse(
+      status:
+          true, // Karena server tidak mengembalikan status, set default ke true
+      message: 'Login successful', // Anda bisa mengganti ini sesuai kebutuhan
+      user: User.fromJson(json), // Langsung menggunakan json untuk User
+      accessToken:
+          json['accessToken'], // Ambil accessToken langsung dari response
+      uuid: json['uuid'], // Ambil uuid langsung dari response
+    );
+  }
 
   // Konversi LoginResponse ke JSON
   Map<String, dynamic> toJson() {
     return {'user': user?.toJson(), 'accessToken': accessToken, 'uuid': uuid};
-  }
-}
-
-class Kelas {
-  final int? id;
-  final String? namaKelas;
-  final int? kelas;
-
-  Kelas({this.id, this.namaKelas, this.kelas});
-
-  factory Kelas.fromJson(Map<String, dynamic> json) {
-    return Kelas(
-      id: json['id'],
-      namaKelas: json['namaKelas'],
-      kelas: json['kelas'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {'id': id, 'namaKelas': namaKelas, 'kelas': kelas};
   }
 }
 
@@ -122,8 +105,8 @@ class Profile {
       persentaseVisual: json['persentaseVisual'],
       persentaseAuditori: json['persentaseAuditori'],
       persentaseKinestetik: json['persentaseKinestetik'],
-      image: json['image'],  // Ensure the key name matches the response
-      url: json['url'],  // Ensure the key name matches the response
+      image: json['image'],
+      url: json['url'],
       user: User.fromJson(json['user']),
     );
   }
@@ -149,6 +132,26 @@ class Profile {
   }
 }
 
+class Kelas {
+  final int? id;
+  final String? namaKelas;
+  final int? kelas;
+
+  Kelas({this.id, this.namaKelas, this.kelas});
+
+  factory Kelas.fromJson(Map<String, dynamic> json) {
+    return Kelas(
+      id: json['id'],
+      namaKelas: json['namaKelas'],
+      kelas: json['kelas'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'namaKelas': namaKelas, 'kelas': kelas};
+  }
+}
+
 class Pelajaran {
   final int? id;
   final String? pelajaran;
@@ -156,17 +159,11 @@ class Pelajaran {
   Pelajaran({this.id, this.pelajaran});
 
   factory Pelajaran.fromJson(Map<String, dynamic> json) {
-    return Pelajaran(
-      id: json['id'],
-      pelajaran: json['pelajaran'],
-    );
+    return Pelajaran(id: json['id'], pelajaran: json['pelajaran']);
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'pelajaran': pelajaran,
-    };
+    return {'id': id, 'pelajaran': pelajaran};
   }
 }
 
@@ -196,7 +193,10 @@ class NilaiSayaModel {
       jumlahSoal: json['jumlahSoal'],
       jumlahJawabanBenar: json['jumlahJawabanBenar'],
       kelas: json['kelas'] != null ? Kelas.fromJson(json['kelas']) : null,
-      pelajaran: json['pelajaran'] != null ? Pelajaran.fromJson(json['pelajaran']) : null,
+      pelajaran:
+          json['pelajaran'] != null
+              ? Pelajaran.fromJson(json['pelajaran'])
+              : null,
       updatedAt: json['updatedAt'],
     );
   }
@@ -214,7 +214,7 @@ class NilaiSayaModel {
   }
 }
 
-class Soal {
+class SoalModel {
   final int? id;
   final String? soal;
   final String? optionA;
@@ -223,9 +223,8 @@ class Soal {
   final String? optionD;
   final String? optionE;
   final String? correctAnswer;
-  final NilaiSoal? nilaiSoal;
 
-  Soal({
+  SoalModel({
     this.id,
     this.soal,
     this.optionA,
@@ -234,11 +233,10 @@ class Soal {
     this.optionD,
     this.optionE,
     this.correctAnswer,
-    this.nilaiSoal,
   });
 
-  factory Soal.fromJson(Map<String, dynamic> json) {
-    return Soal(
+  factory SoalModel.fromJson(Map<String, dynamic> json) {
+    return SoalModel(
       id: json['id'],
       soal: json['soal'],
       optionA: json['optionA'],
@@ -247,7 +245,6 @@ class Soal {
       optionD: json['optionD'],
       optionE: json['optionE'],
       correctAnswer: json['correctAnswer'],
-      nilaiSoal: NilaiSoal.fromJson(json['nilai_soal']),
     );
   }
 
@@ -261,7 +258,6 @@ class Soal {
       'optionD': optionD,
       'optionE': optionE,
       'correctAnswer': correctAnswer,
-      'nilai_soal': nilaiSoal?.toJson(),
     };
   }
 }
@@ -273,10 +269,7 @@ class NilaiSoal {
   NilaiSoal({this.jawaban, this.benar});
 
   factory NilaiSoal.fromJson(Map<String, dynamic> json) {
-    return NilaiSoal(
-      jawaban: json['jawaban'],
-      benar: json['benar'],
-    );
+    return NilaiSoal(jawaban: json['jawaban'], benar: json['benar']);
   }
 
   Map<String, dynamic> toJson() {
@@ -284,3 +277,141 @@ class NilaiSoal {
   }
 }
 
+class NotifikasiModel {
+  final int? id;
+  final String? content;
+  final String? urlImageProfile;
+  bool? isRead;
+  final int? postId;
+  final String? createdAt;
+
+  NotifikasiModel({
+    this.id,
+    this.content,
+    this.urlImageProfile,
+    this.isRead,
+    this.postId,
+    this.createdAt,
+  });
+
+  factory NotifikasiModel.fromJson(Map<String, dynamic> json) {
+    return NotifikasiModel(
+      id: json['id'],
+      content: json['content'],
+      urlImageProfile: json['urlImageProfile'],
+      isRead: json['isRead'] ?? false,
+      postId: json['postId'],
+      createdAt: json['createdAt'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'content': content,
+      'urlImageProfile': urlImageProfile,
+      'isRead': isRead,
+      'postId': postId,
+      'createdAt': createdAt,
+    };
+  }
+}
+
+class ModulModel {
+  final int id;
+  final String? judul;
+  final String? deskripsi;
+  final String? durasi;
+  final int? kelasId;
+  final int? pelajaranId;
+  final Kelas? kelas;
+  final Pelajaran? pelajaran;
+  final String? type;
+  final String? createdAt;
+
+  ModulModel({
+    required this.id,
+    this.judul,
+    this.deskripsi,
+    this.durasi,
+    this.kelasId,
+    this.pelajaranId,
+    this.kelas,
+    this.pelajaran,
+    this.type,
+    this.createdAt,
+  });
+
+  factory ModulModel.fromJson(Map<String, dynamic> json) {
+    return ModulModel(
+      id: json['id'],
+      judul: json['judul'],
+      deskripsi: json['deskripsi'],
+      durasi: json['durasi'],
+      kelasId: json['kelasId'],
+      pelajaranId: json['pelajaranId'],
+      kelas: json['kelas'] != null ? Kelas.fromJson(json['kelas']) : null,
+      pelajaran:
+          json['pelajaran'] != null
+              ? Pelajaran.fromJson(json['pelajaran'])
+              : null,
+      type: json['type'],
+      createdAt: json['createdAt'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'judul': judul,
+      'deskripsi': deskripsi,
+      'durasi': durasi,
+      'kelasId': kelasId,
+      'pelajaranId': pelajaranId,
+      'kelas': kelas,
+      'pelajaran': pelajaran,
+      'type': type,
+      'createdAt': createdAt,
+    };
+  }
+}
+
+class SubModulModel {
+  final int? id;
+  final String subJudul;
+  final String subDeskripsi;
+  final String content;
+  final String? audio;
+  final String? video;
+
+  SubModulModel({
+    this.id,
+    required this.subJudul,
+    required this.subDeskripsi,
+    required this.content,
+    this.audio,
+    this.video,
+  });
+
+  factory SubModulModel.fromJson(Map<String, dynamic> json) {
+    return SubModulModel(
+      id: json['id'],
+      subJudul: json['subJudul'],
+      subDeskripsi: json['subDeskripsi'],
+      content: json['content'],
+      audio: json['audio'],
+      video: json['video'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subJudul': subJudul,
+      'subDeskripsi': subDeskripsi,
+      'content': content,
+      'audio': audio,
+      'video': video,
+    };
+  }
+}

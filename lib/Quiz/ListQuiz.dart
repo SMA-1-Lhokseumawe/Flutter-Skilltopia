@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:skilltopia/Quiz/StartQuiz.dart';
+import '../models.dart';
+import '../repository.dart';
 
 class ListQuiz extends StatefulWidget {
   final String uuid;
@@ -15,70 +18,136 @@ class ListQuiz extends StatefulWidget {
 }
 
 class _ListQuizState extends State<ListQuiz> {
-  // Sample data for quizzes
-  final List<Map<String, dynamic>> quizzes = [
-    {
-      'title': 'Pythagoras Quiz',
-      'subject': 'Matematika',
-      'questionCount': 15,
-      'duration': 30,
-      'grade': 'Kelas 11',
-      'icon': Icons.calculate_rounded,
-      'color': Color(0xFF5C7AEA),
-      'difficulty': 'Sedang',
-    },
-    {
-      'title': 'Hukum Newton Quiz',
-      'subject': 'Fisika',
-      'questionCount': 20,
-      'duration': 45,
-      'grade': 'Kelas 10',
-      'icon': Icons.science_rounded,
-      'color': Color(0xFFE94560),
-      'difficulty': 'Sulit',
-    },
-    {
-      'title': 'Narrative Text Quiz',
-      'subject': 'Bahasa Inggris',
-      'questionCount': 10,
-      'duration': 25,
-      'grade': 'Kelas 10',
-      'icon': Icons.language_rounded,
-      'color': Color(0xFF4E9F3D),
-      'difficulty': 'Mudah',
-    },
-    {
-      'title': 'Persamaan Kuadrat Quiz',
-      'subject': 'Matematika',
-      'questionCount': 12,
-      'duration': 35,
-      'grade': 'Kelas 10',
-      'icon': Icons.calculate_rounded,
-      'color': Color(0xFF5C7AEA),
-      'difficulty': 'Sedang',
-    },
-    {
-      'title': 'Gerak Parabola Quiz',
-      'subject': 'Fisika',
-      'questionCount': 18,
-      'duration': 40,
-      'grade': 'Kelas 11',
-      'icon': Icons.science_rounded,
-      'color': Color(0xFFE94560),
-      'difficulty': 'Sulit',
-    },
-  ];
-
+  final SoalRepository _soalRepository = SoalRepository();
+  List<Map<String, dynamic>> _groupedSoal = [];
+  List<Map<String, dynamic>> _filteredSoal = [];
+  bool _isLoading = true;
   String _filterGrade = '';
+  Map<String, dynamic>? _selectedGroup;
+  bool _showModal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSoalData();
+  }
+
+  Future<void> _fetchSoalData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final groupedData = await _soalRepository.getSoal(widget.accessToken);
+      setState(() {
+        _groupedSoal = groupedData;
+        _filteredSoal = groupedData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorSnackbar('Failed to load quiz data: $e');
+    }
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _filterByGrade(String grade) {
+    setState(() {
+      _filterGrade = grade;
+      
+      if (grade.isEmpty) {
+        _filteredSoal = _groupedSoal;
+      } else {
+        final filterClass = int.parse(grade.split(' ')[1]); // Extract class number
+        _filteredSoal = _groupedSoal.where((group) {
+          final dynamic kelas = group['item']['kelas'];
+          return kelas != null && kelas['kelas'] == filterClass;
+        }).toList();
+      }
+      
+      _selectedGroup = null;
+    });
+  }
+
+  void _showQuizConfirmationDialog(Map<String, dynamic> group) {
+    setState(() {
+      _selectedGroup = group;
+      _showModal = true;
+    });
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Konfirmasi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Tekan lanjutkan untuk mengerjakan tugas dalam waktu 120 menit:'),
+            SizedBox(height: 8),
+            Text(
+              '${group['item']['pelajaran']['pelajaran']} - Kelas ${group['item']['kelas']['kelas']}',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _showModal = false;
+              });
+            },
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF27DEBF),
+            ),
+            child: Text('Lanjutkan'),
+            onPressed: () {
+              Navigator.pop(context);
+              _startQuiz(group);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startQuiz(Map<String, dynamic> group) {
+    // TODO: Navigate to quiz screen
+    print('Starting quiz for: ${group['item']['pelajaran']['pelajaran']}');
+    print('Soal count: ${group['count']}');
+    
+    Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => StartQuiz(
+        groupData: group,
+        accessToken: widget.accessToken,
+        uuid: widget.uuid,
+      ),
+    ),
+  );
+    
+    setState(() {
+      _showModal = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Filter quizzes based on grade if filter is selected
-    List<Map<String, dynamic>> filteredQuizzes =
-        _filterGrade.isEmpty
-            ? quizzes
-            : quizzes.where((quiz) => quiz['grade'] == _filterGrade).toList();
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -139,11 +208,7 @@ class _ListQuizState extends State<ListQuiz> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Filter info & Clear button
-              // Here's the updated code for the Filter info section
-              // Replace the Quiz Count Container with this:
-
-              // Info text section
+              // Filter indicators and info section
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Column(
@@ -190,9 +255,7 @@ class _ListQuizState extends State<ListQuiz> {
                         if (_filterGrade.isNotEmpty)
                           GestureDetector(
                             onTap: () {
-                              setState(() {
-                                _filterGrade = '';
-                              });
+                              _filterByGrade('');
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(
@@ -227,7 +290,7 @@ class _ListQuizState extends State<ListQuiz> {
                       ],
                     ),
 
-                    // Informational text section - New addition
+                    // Informational text section
                     SizedBox(height: 16),
                     Container(
                       padding: EdgeInsets.all(16),
@@ -276,41 +339,212 @@ class _ListQuizState extends State<ListQuiz> {
 
               // Quiz list
               Expanded(
-                child:
-                    filteredQuizzes.isEmpty
-                        ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.quiz_outlined,
-                                size: 60,
-                                color: Colors.grey[400],
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Tidak ada quiz yang tersedia',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                        : ListView.builder(
-                          padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: filteredQuizzes.length,
-                          itemBuilder: (context, index) {
-                            final quiz = filteredQuizzes[index];
-                            return QuizCard(quiz: quiz);
-                          },
+                child: _isLoading 
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF27DEBF),
                         ),
+                      )
+                    : _filteredSoal.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.quiz_outlined,
+                                  size: 60,
+                                  color: Colors.grey[400],
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Tidak ada quiz yang tersedia',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: _filteredSoal.length,
+                            itemBuilder: (context, index) {
+                              final group = _filteredSoal[index];
+                              return _buildQuizCard(group);
+                            },
+                          ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuizCard(Map<String, dynamic> group) {
+    final item = group['item'];
+    final pelajaran = item['pelajaran']['pelajaran'];
+    final kelas = item['kelas']['kelas'];
+    final count = group['count'];
+    
+    return Container(
+      margin: EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            spreadRadius: 0,
+            offset: Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: Color(0xFF27DEBF).withOpacity(0.15),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showQuizConfirmationDialog(group),
+            splashColor: Color(0xFF27DEBF).withOpacity(0.1),
+            highlightColor: Color(0xFF27DEBF).withOpacity(0.05),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Color header
+                Container(
+                  height: 3,
+                  color: Color(0xFF27DEBF),
+                ),
+                
+                // Quiz title section
+                Container(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Subject icon
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: _getSubjectColor(pelajaran).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _getSubjectIcon(pelajaran),
+                            size: 28,
+                            color: _getSubjectColor(pelajaran),
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(width: 16),
+
+                      // Quiz title and subject
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pelajaran,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "Soal ini memiliki sebanyak $count soal dengan type soal pilihan ganda",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Start quiz button
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Color(0xFF27DEBF),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Divider
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Colors.grey.withOpacity(0.1),
+                ),
+
+                // Quiz info section
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Number of questions
+                      _buildInfoItem(
+                        Icons.help_outline_rounded,
+                        '$count Soal',
+                      ),
+
+                      // Vertical divider
+                      Container(
+                        height: 24,
+                        width: 1,
+                        color: Colors.grey.withOpacity(0.2),
+                      ),
+
+                      // Duration
+                      _buildInfoItem(
+                        Icons.timer_outlined,
+                        '120 Menit',
+                      ),
+
+                      // Vertical divider
+                      Container(
+                        height: 24,
+                        width: 1,
+                        color: Colors.grey.withOpacity(0.2),
+                      ),
+
+                      // Grade level
+                      _buildInfoItem(Icons.school_outlined, 'Kelas $kelas'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -360,10 +594,8 @@ class _ListQuizState extends State<ListQuiz> {
 
     return ElevatedButton(
       onPressed: () {
-        setState(() {
-          _filterGrade = isSelected ? '' : grade;
-        });
         Navigator.pop(context);
+        _filterByGrade(isSelected ? '' : grade);
       },
       style: ElevatedButton.styleFrom(
         backgroundColor:
@@ -373,170 +605,6 @@ class _ListQuizState extends State<ListQuiz> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       child: Text(grade.split(' ')[1]),
-    );
-  }
-}
-
-class QuizCard extends StatelessWidget {
-  final Map<String, dynamic> quiz;
-
-  const QuizCard({Key? key, required this.quiz}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            spreadRadius: 0,
-            offset: Offset(0, 4),
-          ),
-        ],
-        border: Border.all(
-          color: Color(0xFF27DEBF).withOpacity(0.15),
-          width: 1,
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              // Navigate to quiz details or start quiz
-            },
-            splashColor: quiz['color'].withOpacity(0.1),
-            highlightColor: quiz['color'].withOpacity(0.05),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Quiz title section
-                Container(
-                  padding: EdgeInsets.all(16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Subject icon
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: quiz['color'].withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            quiz['icon'],
-                            size: 28,
-                            color: quiz['color'],
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(width: 16),
-
-                      // Quiz title and subject
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              quiz['subject'],
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              "Soal ini memiliki sebanyak 1 soal dengan type soal pilihan ganda",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Start quiz button
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Color(0xFF27DEBF),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Divider
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: Colors.grey.withOpacity(0.1),
-                ),
-
-                // Quiz info section
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Number of questions
-                      _buildInfoItem(
-                        Icons.help_outline_rounded,
-                        '${quiz['questionCount']} Soal',
-                      ),
-
-                      // Vertical divider
-                      Container(
-                        height: 24,
-                        width: 1,
-                        color: Colors.grey.withOpacity(0.2),
-                      ),
-
-                      // Duration
-                      _buildInfoItem(
-                        Icons.timer_outlined,
-                        '${quiz['duration']} Menit',
-                      ),
-
-                      // Vertical divider
-                      Container(
-                        height: 24,
-                        width: 1,
-                        color: Colors.grey.withOpacity(0.2),
-                      ),
-
-                      // Grade level
-                      _buildInfoItem(Icons.school_outlined, quiz['grade']),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -557,16 +625,29 @@ class QuizCard extends StatelessWidget {
     );
   }
 
-  Color _getDifficultyColor(String difficulty) {
-    switch (difficulty) {
-      case 'Mudah':
-        return Color(0xFF4CAF50);
-      case 'Sedang':
-        return Color(0xFFFFA000);
-      case 'Sulit':
-        return Color(0xFFE53935);
+  Color _getSubjectColor(String subject) {
+    switch (subject) {
+      case 'Matematika':
+        return Color(0xFF5C7AEA);
+      case 'Fisika':
+        return Color(0xFFE94560);
+      case 'B.Inggris':
+        return Color(0xFF4E9F3D);
       default:
-        return Color(0xFF9E9E9E);
+        return Color.fromARGB(255, 235, 56, 178);
+    }
+  }
+
+  IconData _getSubjectIcon(String subject) {
+    switch (subject) {
+      case 'Matematika':
+        return Icons.calculate_rounded;
+      case 'Fisika' || 'Kimia':
+        return Icons.science_rounded;
+      case 'B.Inggris' || 'B. Indonesia':
+        return Icons.language_rounded;
+      default:
+        return Icons.book_rounded;
     }
   }
 }

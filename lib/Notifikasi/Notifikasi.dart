@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:skilltopia/constants.dart';
+import 'package:skilltopia/repository.dart';
+import 'package:skilltopia/models.dart';
+import 'package:timeago/timeago.dart' as timeago;
+
+String getFileNameFromUrl(String url) {
+  Uri uri = Uri.parse(url);
+  String fileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';
+  return fileName;
+}
 
 class Notifikasi extends StatefulWidget {
   final String uuid;
   final String accessToken;
 
-  const Notifikasi({
-    Key? key, 
-    required this.uuid,
-    required this.accessToken,
-  }) : super(key: key);
+  const Notifikasi({Key? key, required this.uuid, required this.accessToken})
+      : super(key: key);
 
   @override
   State<Notifikasi> createState() => _NotifikasiState();
@@ -16,44 +23,35 @@ class Notifikasi extends StatefulWidget {
 
 class _NotifikasiState extends State<Notifikasi> {
   final Color primaryColor = Color(0xFF27DEBF);
-  // Sample data for notifications
-  final List<Map<String, dynamic>> notifications = [
-    {
-      'name': 'John Doe',
-      'action': 'mengomentari postingan anda',
-      'time': '2 jam yang lalu',
-      'isRead': false,
-      'avatarUrl': 'https://randomuser.me/api/portraits/men/1.jpg',
-    },
-    {
-      'name': 'Jane Smith',
-      'action': 'menyukai postingan anda',
-      'time': '3 jam yang lalu',
-      'isRead': true,
-      'avatarUrl': 'https://randomuser.me/api/portraits/women/2.jpg',
-    },
-    {
-      'name': 'Robert Johnson',
-      'action': 'mengomentari postingan anda',
-      'time': '5 jam yang lalu',
-      'isRead': false,
-      'avatarUrl': 'https://randomuser.me/api/portraits/men/3.jpg',
-    },
-    {
-      'name': 'Emily Davis',
-      'action': 'mulai mengikuti anda',
-      'time': '1 hari yang lalu',
-      'isRead': true,
-      'avatarUrl': 'https://randomuser.me/api/portraits/women/4.jpg',
-    },
-    {
-      'name': 'Michael Brown',
-      'action': 'mengirim pesan kepada anda',
-      'time': '2 hari yang lalu',
-      'isRead': false,
-      'avatarUrl': 'https://randomuser.me/api/portraits/men/5.jpg',
-    },
-  ];
+  final NotifikasiRepository notifikasiRepo = NotifikasiRepository();
+
+  late Future<List<NotifikasiModel>> _notifikasi;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch notifications data from the repository
+    _notifikasi = notifikasiRepo.getNotifikasi(widget.accessToken);
+  }
+
+  // Function to mark notification as read
+  Future<void> markNotificationAsRead(int notificationId) async {
+  try {
+    // Call API to mark notification as read
+    await notifikasiRepo.markAsRead(widget.accessToken, notificationId);
+
+    // Get the notifications from the snapshot and update the status of the one marked as read
+    setState(() {
+      _notifikasi.then((notifications) {
+        final notification = notifications.firstWhere((notif) => notif.id == notificationId);
+        notification.isRead = true; // Mark it as read locally
+      });
+    });
+  } catch (e) {
+    // Handle error if any
+    print("Error marking notification as read: $e");
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -85,199 +83,160 @@ class _NotifikasiState extends State<Notifikasi> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Background curved shapes
-          Positioned(
-            top: -120,
-            right: -60,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                color: Color(0xFF27DEBF).withOpacity(0.4),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -180,
-            left: -120,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                color: Color(0xFF27DEBF).withOpacity(0.4),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
+      body: FutureBuilder<List<NotifikasiModel>>(
+        future: _notifikasi,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return _buildEmptyState();
+          } else {
+            List<NotifikasiModel> notifications = snapshot.data!;
 
-          // Main content - notification list
-          notifications.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    final notification = notifications[index];
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: notification['isRead']
-                            ? Colors.white
-                            : Color(0xFFF0FFFC),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            spreadRadius: 0,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: primaryColor.withOpacity(
-                              notification['isRead'] ? 0.1 : 0.2),
-                          width: 1,
-                        ),
+            return ListView.builder(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final notification = notifications[index];
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: notification.isRead! ? Colors.white : Color(0xFFF0FFFC),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                        offset: Offset(0, 2),
                       ),
-                      child: InkWell(
-                        onTap: () {
-                          // Mark as read when tapped
-                          setState(() {
-                            notifications[index]['isRead'] = true;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Unread indicator
-                              if (!notification['isRead'])
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  margin: EdgeInsets.only(top: 6, right: 8),
-                                  decoration: BoxDecoration(
-                                    color: primaryColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              // Profile picture
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.grey[200],
-                                backgroundImage:
-                                    NetworkImage(notification['avatarUrl']),
+                    ],
+                    border: Border.all(
+                      color: primaryColor.withOpacity(
+                        notification.isRead! ? 0.1 : 0.2,
+                      ),
+                      width: 1,
+                    ),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      // Mark as read when tapped
+                      setState(() {
+                        notifications[index].isRead = true;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Unread indicator
+                          if (!(notification.isRead!))
+                            Container(
+                              width: 8,
+                              height: 8,
+                              margin: EdgeInsets.only(top: 6, right: 8),
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                shape: BoxShape.circle,
                               ),
-                              SizedBox(width: 12),
-                              // Notification content
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    RichText(
-                                      text: TextSpan(
+                            ),
+                          // Profile picture
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage: NetworkImage(
+                              "${AppConstants.baseUrlImage}" + getFileNameFromUrl(notification.urlImageProfile!),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          // Notification content
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                      height: 1.4,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text: notification.content!,
                                         style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.black87,
-                                          height: 1.4,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        children: [
-                                          TextSpan(
-                                            text: notification['name'],
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          TextSpan(
-                                            text: ' ${notification['action']}',
-                                          ),
-                                        ],
                                       ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Klik disini untuk lihat',
-                                      style: TextStyle(
-                                        color: primaryColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    SizedBox(height: 6),
-                                    Text(
-                                      notification['time'],
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Delete button
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: IconButton(
-                                      icon: Icon(
-                                          Icons.delete_outline,
-                                          size: 18,
-                                          color: Colors.red[400]),
-                                      padding: EdgeInsets.zero,
-                                      onPressed: () {
-                                        setState(() {
-                                          notifications.removeAt(index);
-                                        });
-                                      },
-                                    ),
+                                    ],
                                   ),
-                                  SizedBox(height: 8),
-                                  // Mark as read button
-                                  if (!notification['isRead'])
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: primaryColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        icon: Icon(
-                                          Icons.check,
-                                          size: 18,
-                                          color: primaryColor,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        onPressed: () {
-                                          setState(() {
-                                            notifications[index]['isRead'] =
-                                                true;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                ],
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Klik disini untuk lihat',
+                                  style: TextStyle(
+                                    color: primaryColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  timeago.format(DateTime.parse(notification.createdAt!)),
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Column for actions like Delete and Mark as Read
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Delete button
+                              IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Colors.red[400],
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    notifications.removeAt(index);
+                                  });
+                                },
                               ),
+                              SizedBox(height: 8),
+                              // Mark as Read button (visible only if not already read)
+                              if (!(notification.isRead!))
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.check,
+                                    size: 18,
+                                    color: primaryColor,
+                                  ),
+                                  onPressed: () async {
+                                    // Call mark as read function
+                                    await markNotificationAsRead(notification.id!);
+                                  },
+                                ),
                             ],
                           ),
-                        ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-        ],
+                    ),
+                  ),
+                );
+              },
+            );
+          }
+        },
       ),
     );
   }
@@ -304,10 +263,7 @@ class _NotifikasiState extends State<Notifikasi> {
           SizedBox(height: 8),
           Text(
             'Anda akan menerima notifikasi ketika ada aktivitas baru',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -320,7 +276,9 @@ class _NotifikasiState extends State<Notifikasi> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Hapus Semua Notifikasi'),
-        content: Text('Apakah Anda yakin ingin menghapus semua notifikasi?'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus semua notifikasi?',
+        ),
         actions: [
           TextButton(
             child: Text('Batal', style: TextStyle(color: Colors.grey[600])),
@@ -337,10 +295,7 @@ class _NotifikasiState extends State<Notifikasi> {
             ),
             child: Text('Hapus'),
             onPressed: () {
-              setState(() {
-                notifications.clear();
-              });
-              Navigator.pop(context);
+
             },
           ),
         ],

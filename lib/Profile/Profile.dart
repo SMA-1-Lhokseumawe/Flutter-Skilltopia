@@ -7,17 +7,17 @@ import 'package:skilltopia/loginPage.dart';
 
 import 'package:skilltopia/repository.dart';
 
-class Profile extends StatefulWidget {
+class ProfilePage extends StatefulWidget {
   final String uuid;
   final String accessToken;
 
-  const Profile({Key? key, required this.uuid, required this.accessToken}) : super(key: key);
+  const ProfilePage({Key? key, required this.uuid, required this.accessToken}) : super(key: key);
 
   @override
-  State<Profile> createState() => _ProfileState();
+  State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfileState extends State<Profile> {
+class _ProfilePageState extends State<ProfilePage> {
   String nama = '';
   String email = '';
   String gayaBelajar = '';
@@ -313,7 +313,10 @@ class _ProfileState extends State<Profile> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => EditProfile(),
+                                  builder: (context) => EditProfile(
+                                    uuid: widget.uuid,
+                                    accessToken: widget.accessToken,
+                                  ),
                                 ),
                               );
                             },
@@ -333,7 +336,10 @@ class _ProfileState extends State<Profile> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => GantiPassword(),
+                                  builder: (context) => GantiPassword(
+                                    uuid: widget.uuid,
+                                    accessToken: widget.accessToken,
+                                  ),
                                 ),
                               );
                             },

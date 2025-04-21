@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:skilltopia/Materi/ListSubModul.dart';
+import 'package:skilltopia/models.dart'; // Import model
+import 'package:skilltopia/repository.dart'; // Import repository
 
 class ListModul extends StatefulWidget {
   final String uuid;
   final String accessToken;
+  final String gayaBelajar;
 
   const ListModul({
-    Key? key, 
+    Key? key,
     required this.uuid,
     required this.accessToken,
+    required this.gayaBelajar,
   }) : super(key: key);
 
   @override
@@ -16,85 +20,72 @@ class ListModul extends StatefulWidget {
 }
 
 class _ListModulState extends State<ListModul> {
-  // Sample data for modules
-  final List<Map<String, dynamic>> modules = [
-    {
-      'title': 'Phytagoras',
-      'type': 'Visual',
-      'description':
-          'Pythagoras adalah rumus yang terdapat dalam bagian geometri. Rumus ini berguna untuk menunjukkan hubungan antara panjang sisi segitiga siku-siku, dengan salah satu sudut 90 derajat.',
-      'subject': 'Matematika',
-      'duration': '20 Jam',
-      'grade': 'Kelas 11',
-      'color': Color(0xFF5C7AEA),
-      'icon': Icons.visibility_outlined,
-    },
-    {
-      'title': 'Hukum Newton',
-      'type': 'Kinestetik',
-      'description':
-          'Hukum Newton menjelaskan hubungan antara gaya yang bekerja pada benda dan gerakannya. Terdapat tiga hukum dasar yang menjelaskan konsep gerak dalam fisika klasik.',
-      'subject': 'Fisika',
-      'duration': '15 Jam',
-      'grade': 'Kelas 10',
-      'color': Color(0xFFE94560),
-      'icon': Icons.accessibility_new_rounded,
-    },
-    {
-      'title': 'Narrative Text',
-      'type': 'Auditori',
-      'description':
-          'Narrative text adalah jenis teks yang menceritakan sebuah kisah, baik fiksi maupun non-fiksi. Teks ini memiliki struktur dan ciri kebahasaan tertentu.',
-      'subject': 'Bahasa Inggris',
-      'duration': '10 Jam',
-      'grade': 'Kelas 10',
-      'color': Color(0xFF4E9F3D),
-      'icon': Icons.hearing_outlined,
-    },
-    {
-      'title': 'Persamaan Kuadrat',
-      'type': 'Visual',
-      'description':
-          'Persamaan kuadrat adalah persamaan dengan variabel berderajat tertinggi dua. Persamaan ini dapat diselesaikan dengan berbagai metode seperti faktorisasi dan rumus ABC.',
-      'subject': 'Matematika',
-      'duration': '25 Jam',
-      'grade': 'Kelas 10',
-      'color': Color(0xFF5C7AEA),
-      'icon': Icons.visibility_outlined,
-    },
-    {
-      'title': 'Gerak Parabola',
-      'type': 'Kinestetik',
-      'description':
-          'Gerak parabola adalah gerak dua dimensi yang mengikuti lintasan berbentuk parabola. Konsep ini menggabungkan gerak lurus beraturan dan gerak jatuh bebas.',
-      'subject': 'Fisika',
-      'duration': '18 Jam',
-      'grade': 'Kelas 11',
-      'color': Color(0xFFE94560),
-      'icon': Icons.accessibility_new_rounded,
-    },
-  ];
-
+  final ModulRepository _modulRepository = ModulRepository();
+  List<ModulModel> modules = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchModules();
+  }
+
+  Future<void> _fetchModules() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final fetchedModules = await _modulRepository.getModul(
+        widget.accessToken,
+      );
+      setState(() {
+        modules = fetchedModules;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load modules: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     // Filter modules based on search query
-    List<Map<String, dynamic>> filteredModules = modules;
+    List<ModulModel> filteredModules = modules;
     if (_searchQuery.isNotEmpty) {
       filteredModules =
           modules
               .where(
                 (module) =>
-                    module['title'].toLowerCase().contains(
-                      _searchQuery.toLowerCase(),
-                    ) ||
-                    module['description'].toLowerCase().contains(
-                      _searchQuery.toLowerCase(),
-                    ) ||
-                    module['subject'].toLowerCase().contains(
-                      _searchQuery.toLowerCase(),
-                    ),
+                    (module.judul?.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ) ??
+                        false) ||
+                    (module.deskripsi?.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ) ??
+                        false) ||
+                    (module.pelajaran?.pelajaran?.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ) ??
+                        false),
+              )
+              .toList();
+    }
+
+    if (widget.gayaBelajar.isNotEmpty) {
+      filteredModules =
+          filteredModules
+              .where(
+                (module) =>
+                    module.type?.toLowerCase() ==
+                    widget.gayaBelajar.toLowerCase(),
               )
               .toList();
     }
@@ -208,7 +199,47 @@ class _ListModulState extends State<ListModul> {
               // Main content - module list
               Expanded(
                 child:
-                    filteredModules.isEmpty
+                    _isLoading
+                        ? Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF27DEBF),
+                          ),
+                        )
+                        : _errorMessage.isNotEmpty
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 60,
+                                color: Colors.red[400],
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                _errorMessage,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 24),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFF27DEBF),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: _fetchModules,
+                                child: Text('Coba Lagi'),
+                              ),
+                            ],
+                          ),
+                        )
+                        : filteredModules.isEmpty
                         ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -235,7 +266,305 @@ class _ListModulState extends State<ListModul> {
                           itemCount: filteredModules.length,
                           itemBuilder: (context, index) {
                             final module = filteredModules[index];
-                            return ModuleCard(module: module);
+
+                            // Determine the color and icon based on type
+                            Color typeColor;
+                            IconData typeIcon;
+
+                            switch (module.type?.toLowerCase() ?? '') {
+                              case 'visual':
+                                typeColor = Color(0xFF5C7AEA);
+                                typeIcon = Icons.visibility_outlined;
+                                break;
+                              case 'kinestetik':
+                                typeColor = Color(0xFFE94560);
+                                typeIcon = Icons.accessibility_new_rounded;
+                                break;
+                              case 'auditori':
+                                typeColor = Color(0xFF4E9F3D);
+                                typeIcon = Icons.hearing_outlined;
+                                break;
+                              default:
+                                typeColor = Color(0xFF5C7AEA);
+                                typeIcon = Icons.book_outlined;
+                            }
+
+                            // Helper function to get subject icon
+                            IconData getSubjectIcon(String subject) {
+                              switch (subject) {
+                                case 'Matematika':
+                                  return Icons.calculate_rounded;
+                                case 'Fisika':
+                                  return Icons.science_rounded;
+                                case 'B.Inggris':
+                                  return Icons.language_rounded;
+                                case 'B. Indonesia':
+                                  return Icons.menu_book_rounded;
+                                default:
+                                  return Icons.book_rounded;
+                              }
+                            }
+
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => ListSubModul(
+                                          modulId: module.id,
+                                          accessToken: widget.accessToken,
+                                        ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      spreadRadius: 0,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color: Color(0xFF27DEBF).withOpacity(0.15),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Module header with type indicator
+                                    Container(
+                                      padding: EdgeInsets.fromLTRB(
+                                        16,
+                                        16,
+                                        16,
+                                        12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(16),
+                                          topRight: Radius.circular(16),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Type indicator and bookmark button
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 5,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: typeColor.withOpacity(
+                                                    0.1,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                  border: Border.all(
+                                                    color: typeColor
+                                                        .withOpacity(0.3),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      typeIcon,
+                                                      size: 16,
+                                                      color: typeColor,
+                                                    ),
+                                                    SizedBox(width: 6),
+                                                    Text(
+                                                      module.type ?? 'Unknown',
+                                                      style: TextStyle(
+                                                        color: typeColor,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+
+                                          SizedBox(height: 12),
+
+                                          // Module title
+                                          Text(
+                                            module.judul ?? 'No Title',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+
+                                          SizedBox(height: 8),
+
+                                          // Module description
+                                          Text(
+                                            module.deskripsi ??
+                                                'No Description',
+                                            style: TextStyle(
+                                              color: Colors.black54,
+                                              fontSize: 14,
+                                              height: 1.5,
+                                            ),
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Divider
+                                    Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: Colors.grey.withOpacity(0.1),
+                                    ),
+
+                                    // Module metadata section
+                                    Container(
+                                      padding: EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.withOpacity(0.02),
+                                        borderRadius: BorderRadius.only(
+                                          bottomLeft: Radius.circular(16),
+                                          bottomRight: Radius.circular(16),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // Subject indicator
+                                          Container(
+                                            padding: EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Color(
+                                                0xFF27DEBF,
+                                              ).withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              getSubjectIcon(
+                                                module.pelajaran?.pelajaran ??
+                                                    '',
+                                              ),
+                                              size: 18,
+                                              color: Color(0xFF27DEBF),
+                                            ),
+                                          ),
+                                          SizedBox(width: 10),
+                                          Text(
+                                            module.pelajaran?.pelajaran ??
+                                                'Unknown Subject',
+                                            style: TextStyle(
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+
+                                          Spacer(),
+
+                                          // Duration indicator
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.withOpacity(
+                                                0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time_rounded,
+                                                  size: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  module.durasi != null
+                                                      ? '${module.durasi} Jam'
+                                                      : 'N/A',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[700],
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          SizedBox(width: 8),
+
+                                          // Grade level indicator
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.withOpacity(
+                                                0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.school_rounded,
+                                                  size: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  module.kelas?.kelas != null
+                                                      ? 'Kelas ${module.kelas?.kelas}'
+                                                      : 'N/A',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[700],
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
                           },
                         ),
               ),
@@ -358,246 +687,5 @@ class _ListModulState extends State<ListModul> {
         // Handle filter selection
       },
     );
-  }
-}
-
-class ModuleCard extends StatelessWidget {
-  final Map<String, dynamic> module;
-
-  const ModuleCard({Key? key, required this.module}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => ListSubModul()),
-        );
-      },
-      child: Container(
-        margin: EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              spreadRadius: 0,
-              offset: Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: Color(0xFF27DEBF).withOpacity(0.15),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Module header with type indicator
-            Container(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Type indicator and bookmark button
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: module['color'].withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: module['color'].withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              module['icon'],
-                              size: 16,
-                              color: module['color'],
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              module['type'],
-                              style: TextStyle(
-                                color: module['color'],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 12),
-
-                  // Module title
-                  Text(
-                    module['title'],
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-
-                  SizedBox(height: 8),
-
-                  // Module description
-                  Text(
-                    module['description'],
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-
-            // Divider
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: Colors.grey.withOpacity(0.1),
-            ),
-
-            // Module metadata section
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.02),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                children: [
-                  // Subject indicator
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF27DEBF).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _getSubjectIcon(module['subject']),
-                      size: 18,
-                      color: Color(0xFF27DEBF),
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    module['subject'],
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-
-                  Spacer(),
-
-                  // Duration indicator
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 14,
-                          color: Colors.grey[700],
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          module['duration'],
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(width: 8),
-
-                  // Grade level indicator
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.school_rounded,
-                          size: 14,
-                          color: Colors.grey[700],
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          module['grade'],
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Helper method to get subject icon
-  IconData _getSubjectIcon(String subject) {
-    switch (subject) {
-      case 'Matematika':
-        return Icons.calculate_rounded;
-      case 'Fisika':
-        return Icons.science_rounded;
-      case 'Bahasa Inggris':
-        return Icons.language_rounded;
-      default:
-        return Icons.book_rounded;
-    }
   }
 }
