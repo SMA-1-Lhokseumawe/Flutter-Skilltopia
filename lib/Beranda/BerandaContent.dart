@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:skilltopia/Diskusi/DiskusiPage.dart';
 import 'package:skilltopia/Kuesioner/Kuesioner.dart';
 import 'package:skilltopia/Materi/ListModul.dart';
+import 'package:skilltopia/Profile/AddProfile.dart';
 import 'package:skilltopia/Quiz/ListQuiz.dart';
 import 'package:skilltopia/TipsAndTrick/TipsAndTrick.dart';
+import 'package:skilltopia/loginPage.dart';
 import 'package:skilltopia/repository.dart';
 import 'package:skilltopia/constants.dart';
 
 class BerandaContent extends StatefulWidget {
   final String uuid;
+  final String username;
   final String accessToken;
 
   const BerandaContent({
     Key? key,
     required this.uuid,
+    required this.username,
     required this.accessToken,
   }) : super(key: key);
 
@@ -21,6 +26,7 @@ class BerandaContent extends StatefulWidget {
 }
 
 class _BerandaContentState extends State<BerandaContent> {
+  late int siswaId;
   String nama = '';
   String image = '';
   String gayaBelajar = '';
@@ -39,30 +45,122 @@ class _BerandaContentState extends State<BerandaContent> {
 
       if (response['status']) {
         final data = response['data'];
-        setState(() {
-          nama = data['nama'] ?? '';
-          image = data['image'] ?? '';
-          gayaBelajar = data['gayaBelajar'] ?? '';
-          isLoading = false;
-        });
+        // Check if data is null or empty (profile not created)
+        if (data == null || (data is Map && data.isEmpty)) {
+          _showProfileNotCreatedDialog();
+        } else {
+          setState(() {
+            siswaId = data['id'] ?? '';
+            nama = data['nama'] ?? '';
+            image = data['image'] ?? '';
+            gayaBelajar = data['gayaBelajar'] ?? '';
+            isLoading = false;
+          });
+        }
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response?['message'] ?? 'Error fetching profile'),
-          ),
-        );
+        // Show dialog if profile doesn't exist
+        _showProfileNotCreatedDialog();
       }
     } catch (error) {
       setState(() {
         isLoading = false;
       });
+      // Show error message but don't show the dialog
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Error fetching profile: $error")));
     }
+  }
+
+  void _logout(BuildContext context) async {
+    if (widget.accessToken == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Token tidak ditemukan, Anda belum login")),
+      );
+      return;
+    }
+
+    final repository = UserRepository();
+
+    try {
+      final success = await repository.logoutUser(widget.accessToken!);
+
+      if (success) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Berhasil logout")));
+
+        // Redirect ke LoginPage setelah logout
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const loginPage()),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal logout")));
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $error")));
+    }
+  }
+
+  void _showProfileNotCreatedDialog() {
+    setState(() {
+      isLoading = false;
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User must tap a button to dismiss
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFF27DEBF)),
+              SizedBox(width: 10),
+              Text('Pemberitahuan'),
+            ],
+          ),
+          content: Text(
+            'Profil siswa Anda belum dibuat. Silakan buat profil untuk melanjutkan.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('KELUAR', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                _logout(context); // Call logout function
+              },
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF27DEBF),
+              ),
+              child: Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                // Navigate to AddProfile
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => AddProfile(
+                          uuid: widget.uuid,
+                          accessToken: widget.accessToken,
+                          username: widget.username
+                        ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -147,9 +245,21 @@ class _BerandaContentState extends State<BerandaContent> {
                         child: ClipOval(
                           child: Builder(
                             builder: (context) {
+                              // Periksa dulu apakah image kosong
+                              if (image.isEmpty) {
+                                return Image.asset(
+                                  'assets/profile.png',
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.cover,
+                                );
+                              }
+
+                              // Jika image tidak kosong, gunakan NetworkImage
                               String imageUrl =
                                   "${AppConstants.baseUrlImage}${image}";
-                              print("tes: ${imageUrl}");
+                              print("Image URL: $imageUrl");
+
                               return Image(
                                 image: NetworkImage(imageUrl),
                                 width: 56,
@@ -169,6 +279,7 @@ class _BerandaContentState extends State<BerandaContent> {
                                   }
                                 },
                                 errorBuilder: (context, error, stackTrace) {
+                                  print("Error loading image: $error");
                                   return Image.asset(
                                     'assets/profile.png',
                                     width: 56,
@@ -269,13 +380,18 @@ class _BerandaContentState extends State<BerandaContent> {
                         icon: Icons.question_answer_rounded,
                         color: Color(0xFF5C7AEA),
                         onTap: () {
+                          String judulContent = '';
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder:
-                                  (context) => Kuesioner(
+                                  (context) => DiskusiPage(
                                     uuid: widget.uuid,
+                                    username: widget.username,
                                     accessToken: widget.accessToken,
+                                    siswaId: siswaId,
+                                    judulContent: judulContent,
                                   ),
                             ),
                           );
@@ -312,7 +428,8 @@ class _BerandaContentState extends State<BerandaContent> {
                                   (context) => ListModul(
                                     uuid: widget.uuid,
                                     accessToken: widget.accessToken,
-                                    gayaBelajar: gayaBelajar
+                                    gayaBelajar: gayaBelajar,
+                                    username: widget.username
                                   ),
                             ),
                           );

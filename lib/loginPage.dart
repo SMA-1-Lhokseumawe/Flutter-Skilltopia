@@ -59,6 +59,7 @@ class _loginPageState extends State<loginPage> {
         if (response.status) {
           
           final uuid = response.uuid ?? '';
+          final username = response.username ?? '';
           final accessToken = response.accessToken ?? '';
 
           Navigator.pushReplacement(
@@ -68,6 +69,7 @@ class _loginPageState extends State<loginPage> {
               duration: Duration(milliseconds: 300),
               child: Beranda(
                 uuid: uuid,
+                username: username,
                 accessToken: accessToken,
               ),
             ),

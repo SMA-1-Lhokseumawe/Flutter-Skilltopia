@@ -11,11 +11,13 @@ import 'package:skilltopia/repository.dart';
 
 class Beranda extends StatefulWidget {
   final String uuid;
+  final String username;
   final String accessToken;
 
   const Beranda({
     Key? key,
     required this.uuid,
+    required this.username,
     required this.accessToken,
   }) : super(key: key);
 
@@ -37,10 +39,11 @@ class _BerandaState extends State<Beranda> {
     _screens = [
       BerandaContent(
         uuid: widget.uuid,
+        username: widget.username,
         accessToken: widget.accessToken,
       ),
       NilaiSaya(uuid: widget.uuid, accessToken: widget.accessToken),
-      Notifikasi(uuid: widget.uuid, accessToken: widget.accessToken),
+      Notifikasi(uuid: widget.uuid, username: widget.username, accessToken: widget.accessToken),
       ProfilePage(uuid: widget.uuid, accessToken: widget.accessToken),
     ];
   }

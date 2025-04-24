@@ -5,6 +5,7 @@ import 'package:skilltopia/models.dart';
 import 'package:skilltopia/constants.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as path;
 
 class UserRepository {
   Future<LoginResponse> loginUser(String username, String password) async {
@@ -84,15 +85,80 @@ class UserRepository {
         headers: {"Authorization": "Bearer $accessToken"},
       );
 
-      // Ensure you're properly parsing the response
-      if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
-        return responseBody; // This should return the profile data correctly
-      } else {
-        throw Exception('Failed to load profile');
-      }
+      // Parse the response
+      final responseBody = jsonDecode(response.body);
+
+      // Return the response regardless of status
+      return responseBody;
     } catch (error) {
-      rethrow;
+      // Return a formatted error instead of rethrowing
+      return {
+        'status': false,
+        'message': 'Error fetching profile: ${error.toString()}',
+        'data': null,
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> addProfile({
+    required String accessToken,
+    required Map<String, dynamic> profileData,
+    File? imageFile,
+  }) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/siswa");
+    final request = http.MultipartRequest('POST', url);
+
+    // Tambahkan header Authorization
+    request.headers['Authorization'] = 'Bearer $accessToken';
+
+    // Tambahkan data profil ke fields request
+    profileData.forEach((key, value) {
+      request.fields[key] = value.toString();
+    });
+
+    // Tambahkan file gambar jika ada
+    if (imageFile != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          imageFile.path,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+    }
+
+    try {
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final responseJson = jsonDecode(responseBody);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // Log imagePath jika ada
+        if (responseJson['data'] != null &&
+            responseJson['data']['image'] != null) {
+          print("Image Path: ${responseJson['data']['image']}");
+        }
+
+        return {
+          'status': true,
+          'message': responseJson['msg'] ?? 'Profil berhasil dibuat',
+          'data': responseJson['data'],
+        };
+      } else {
+        print("Error creating profile: $responseBody");
+        return {
+          'status': false,
+          'message': responseJson['msg'] ?? 'Gagal membuat profil',
+          'data': null,
+        };
+      }
+    } catch (e) {
+      print("Exception occurred: $e");
+      return {
+        'status': false,
+        'message': 'Terjadi kesalahan: ${e.toString()}',
+        'data': null,
+      };
     }
   }
 
@@ -155,14 +221,19 @@ class UserRepository {
     }
   }
 
-  Future<Map<String, dynamic>> updatePassword(String accessToken, String oldPassword, String newPassword, String confirmPassword) async {
+  Future<Map<String, dynamic>> updatePassword(
+    String accessToken,
+    String oldPassword,
+    String newPassword,
+    String confirmPassword,
+  ) async {
     if (newPassword != confirmPassword) {
       return {
         'status': false,
         'message': 'Password baru dan konfirmasi password tidak cocok',
       };
     }
-    
+
     final url = Uri.parse("${AppConstants.baseUrl}/change-password");
 
     try {
@@ -180,10 +251,7 @@ class UserRepository {
       final response = await http.patch(url, headers: headers, body: body);
 
       if (response.statusCode == 200) {
-        return {
-          'status': true,
-          'message': 'Password berhasil diperbarui',
-        };
+        return {'status': true, 'message': 'Password berhasil diperbarui'};
       } else {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         return {
@@ -192,10 +260,7 @@ class UserRepository {
         };
       }
     } catch (error) {
-      return {
-        'status': false,
-        'message': 'Terjadi kesalahan jaringan',
-      };
+      return {'status': false, 'message': 'Terjadi kesalahan jaringan'};
     }
   }
 }
@@ -234,20 +299,20 @@ class NilaiSayaRepository {
     // Calculate score
     int score = 0;
     final totalQuestions = questions.length;
-    
+
     // Collect soalIds
     final soalIds = questions.map((q) => q['id']).toList();
-    
+
     // Count correct answers
     questions.forEach((q) {
       if (userAnswers[q['id']] == q['correctAnswer']) {
         score++;
       }
     });
-    
+
     // Calculate percentage
     final percentage = ((score / totalQuestions) * 100).round();
-    
+
     // Determine level
     String level = "Low";
     if (percentage > 66.66) {
@@ -255,14 +320,19 @@ class NilaiSayaRepository {
     } else if (percentage > 33.33) {
       level = "Medium";
     }
-    
+
     // Create detailed answers
-    final detailedAnswers = questions.map((q) => {
-      'soalId': q['id'],
-      'jawaban': userAnswers[q['id']] ?? null,
-      'benar': userAnswers[q['id']] == q['correctAnswer']
-    }).toList();
-    
+    final detailedAnswers =
+        questions
+            .map(
+              (q) => {
+                'soalId': q['id'],
+                'jawaban': userAnswers[q['id']] ?? null,
+                'benar': userAnswers[q['id']] == q['correctAnswer'],
+              },
+            )
+            .toList();
+
     // Prepare quiz result data
     final quizResultData = {
       'skor': percentage,
@@ -273,9 +343,9 @@ class NilaiSayaRepository {
       'kelasId': groupData['item']['kelas']['id'],
       'siswaId': siswaId,
       'soalIds': soalIds,
-      'detailedAnswers': detailedAnswers
+      'detailedAnswers': detailedAnswers,
     };
-    
+
     try {
       final url = Uri.parse('${AppConstants.baseUrl}/nilai');
       final response = await http.post(
@@ -286,25 +356,19 @@ class NilaiSayaRepository {
         },
         body: jsonEncode(quizResultData),
       );
-      
+
       if (response.statusCode == 201 || response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         return {
           'status': true,
           'nilaiId': responseData['nilaiId'],
-          'message': 'Quiz submitted successfully'
+          'message': 'Quiz submitted successfully',
         };
       } else {
-        return {
-          'status': false,
-          'message': 'Failed to submit quiz'
-        };
+        return {'status': false, 'message': 'Failed to submit quiz'};
       }
     } catch (error) {
-      return {
-        'status': false,
-        'message': 'Error: ${error.toString()}'
-      };
+      return {'status': false, 'message': 'Error: ${error.toString()}'};
     }
   }
 }
@@ -413,7 +477,7 @@ class SubModulRepository {
 class SoalRepository {
   Future<List<Map<String, dynamic>>> getSoal(String accessToken) async {
     final url = Uri.parse("${AppConstants.baseUrl}/all-soal");
-    
+
     try {
       final response = await http.get(
         url,
@@ -422,7 +486,7 @@ class SoalRepository {
           'Authorization': 'Bearer $accessToken',
         },
       );
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> responseData = json.decode(response.body);
         return groupSoalByKelasPelajaran(responseData);
@@ -442,11 +506,7 @@ class SoalRepository {
       final key = '${item['kelasId']}-${item['pelajaranId']}';
 
       if (!groupedData.containsKey(key)) {
-        groupedData[key] = {
-          'count': 0,
-          'item': item,
-          'items': [],
-        };
+        groupedData[key] = {'count': 0, 'item': item, 'items': []};
       }
 
       groupedData[key]!['count'] = groupedData[key]!['count'] + 1;
@@ -454,5 +514,422 @@ class SoalRepository {
     }
 
     return groupedData.values.toList();
+  }
+}
+
+class DiskusiRepository {
+  // Fetch all discussions
+  Future<List<DiskusiModel>> getDiskusi(String accessToken) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/all-post");
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => DiskusiModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load discussions: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching discussions: $e');
+    }
+  }
+
+  Future<List<DiskusiModel>> getMyDiskusi(String accessToken) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/post");
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => DiskusiModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load discussions: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching discussions: $e');
+    }
+  }
+
+  Future<List<DiskusiModel>> getAllDiskusiWithoutComment(
+    String accessToken,
+  ) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/post-nocomment");
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => DiskusiModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load discussions: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching discussions: $e');
+    }
+  }
+
+  // Get discussion by ID
+  Future<DiskusiModel> getDiskusiById(String accessToken, int postId) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/post/$postId");
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic data = json.decode(response.body);
+        return DiskusiModel.fromJson(data);
+      } else {
+        throw Exception('Failed to load discussion: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching discussion: $e');
+    }
+  }
+
+  // Create a new discussion post
+  Future<DiskusiModel> createDiskusiWithImages({
+    required String accessToken,
+    required String judul,
+    required String content,
+    required String kategori,
+    required int siswaId,
+    required List<File> imageFiles,
+  }) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/post");
+
+    try {
+      // Create multipart request
+      var request = http.MultipartRequest('POST', url);
+
+      // Add headers
+      request.headers['Authorization'] = 'Bearer $accessToken';
+
+      // Add text fields
+      request.fields['judul'] = judul;
+      request.fields['content'] = content;
+      request.fields['kategori'] = kategori;
+      request.fields['siswaId'] = siswaId.toString();
+      request.fields['guruId'] = ''; // Empty or null
+
+      // Add image files if any
+      for (var imageFile in imageFiles) {
+        final fileName = path.basename(imageFile.path);
+        final fileExtension = path.extension(fileName).toLowerCase();
+
+        // Determine mime type based on file extension
+        String mimeType = 'image/jpeg'; // Default
+        if (fileExtension == '.png') {
+          mimeType = 'image/png';
+        } else if (fileExtension == '.jpg' || fileExtension == '.jpeg') {
+          mimeType = 'image/jpeg';
+        }
+
+        // Create multipart file
+        final multipartFile = await http.MultipartFile.fromPath(
+          'files', // field name must match the API expectation
+          imageFile.path,
+          contentType: MediaType.parse(mimeType),
+        );
+
+        // Add file to request
+        request.files.add(multipartFile);
+      }
+
+      // Send the request
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      // Check response
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final dynamic data = json.decode(response.body);
+        return DiskusiModel.fromJson(data);
+      } else {
+        throw Exception(
+          'Failed to create discussion: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error creating discussion: $e');
+    }
+  }
+
+  Future<DiskusiModel> updateDiskusiWithImages({
+    required String accessToken,
+    required int postId,
+    required String judul,
+    required String content,
+    required String kategori,
+    required List<String> existingImages,
+    required List<String> removedImages,
+    required List<File> newImageFiles,
+  }) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/post/$postId");
+
+    try {
+      // Create multipart request
+      var request = http.MultipartRequest(
+        'PATCH',
+        url,
+      ); // Use PATCH for updates
+
+      // Add headers
+      request.headers['Authorization'] = 'Bearer $accessToken';
+
+      // Add text fields
+      request.fields['judul'] = judul;
+      request.fields['content'] = content;
+      request.fields['kategori'] = kategori;
+
+      // Add the list of existing images that should be kept
+      request.fields['existingImages'] = json.encode(existingImages);
+
+      // Add the list of removed images
+      request.fields['removedImages'] = json.encode(removedImages);
+
+      // Add new image files if any
+      for (var imageFile in newImageFiles) {
+        final fileName = path.basename(imageFile.path);
+        final fileExtension = path.extension(fileName).toLowerCase();
+
+        // Determine mime type based on file extension
+        String mimeType = 'image/jpeg'; // Default
+        if (fileExtension == '.png') {
+          mimeType = 'image/png';
+        } else if (fileExtension == '.jpg' || fileExtension == '.jpeg') {
+          mimeType = 'image/jpeg';
+        }
+
+        // Create multipart file
+        final multipartFile = await http.MultipartFile.fromPath(
+          'files', // field name must match the API expectation
+          imageFile.path,
+          contentType: MediaType.parse(mimeType),
+        );
+
+        // Add file to request
+        request.files.add(multipartFile);
+      }
+
+      // Send the request
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      // Check response
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final dynamic data = json.decode(response.body);
+        return DiskusiModel.fromJson(data);
+      } else {
+        throw Exception(
+          'Failed to update discussion: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error updating discussion: $e');
+    }
+  }
+
+  Future<void> deleteDiskusi({
+    required String accessToken,
+    required int postId,
+  }) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/post/$postId");
+
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghapus diskusi: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error menghapus diskusi: $e');
+    }
+  }
+}
+
+class KomentarRepository {
+  // Fetch all comments
+  Future<List<KomentarModel>> getKomentar(String accessToken) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/all-komentar");
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => KomentarModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load comments: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching comments: $e');
+    }
+  }
+
+  // Fetch comments for a specific post
+  Future<List<KomentarModel>> getKomentarByPostId(
+    String accessToken,
+    int postId,
+  ) async {
+    try {
+      // Fetch all comments
+      final url = Uri.parse("${AppConstants.baseUrl}/all-komentar");
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+
+        // Filter comments locally by postId
+        final filteredComments =
+            data
+                .map((json) => KomentarModel.fromJson(json))
+                .where((comment) => comment.postId == postId)
+                .toList();
+
+        return filteredComments;
+      } else {
+        throw Exception('Failed to load comments: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching comments: $e');
+      throw Exception('Error fetching comments: $e');
+    }
+  }
+
+  // Post a new comment
+  Future<KomentarModel> postKomentar({
+    required String accessToken,
+    required int postId,
+    required int siswaId,
+    required String content,
+  }) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/komentar");
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: json.encode({
+          'postId': postId,
+          'siswaId': siswaId,
+          'guruId': null,
+          'content': content,
+        }),
+      );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final dynamic data = json.decode(response.body);
+        return KomentarModel.fromJson(data);
+      } else {
+        throw Exception('Failed to post comment: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error posting comment: $e');
+      throw Exception('Error posting comment: $e');
+    }
+  }
+
+  // Update a comment
+  Future<KomentarModel> updateKomentar({
+    required String accessToken,
+    required int komentarId,
+    required String content,
+  }) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/komentar/$komentarId");
+
+    try {
+      final response = await http.patch(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: json.encode({'content': content}),
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic data = json.decode(response.body);
+        return KomentarModel.fromJson(data);
+      } else {
+        throw Exception('Failed to update comment: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating comment: $e');
+    }
+  }
+
+  // Delete a comment
+  Future<bool> deleteKomentar(String accessToken, int komentarId) async {
+    final url = Uri.parse("${AppConstants.baseUrl}/komentar/$komentarId");
+
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        throw Exception('Failed to delete comment: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error deleting comment: $e');
+    }
   }
 }

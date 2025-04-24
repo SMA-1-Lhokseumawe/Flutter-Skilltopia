@@ -11,7 +11,8 @@ class ProfilePage extends StatefulWidget {
   final String uuid;
   final String accessToken;
 
-  const ProfilePage({Key? key, required this.uuid, required this.accessToken}) : super(key: key);
+  const ProfilePage({Key? key, required this.uuid, required this.accessToken})
+    : super(key: key);
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -210,18 +211,28 @@ class _ProfilePageState extends State<ProfilePage> {
                           radius: 50,
                           backgroundColor: const Color(0xFF27DEBF),
                           child: ClipOval(
-                            child: Image.network(
-                              '${AppConstants.baseUrlImage}${image}',
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                              errorBuilder:
-                                  (context, error, stackTrace) => const Icon(
-                                    Icons.person,
-                                    color: Colors.white,
-                                    size: 50,
-                                  ),
-                            ),
+                            child:
+                                image != null && image.isNotEmpty
+                                    ? Image.network(
+                                      '${AppConstants.baseUrlImage}${image}',
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Image.asset(
+                                                'assets/profile.png',
+                                                width: 100,
+                                                height: 100,
+                                                fit: BoxFit.cover,
+                                              ),
+                                    )
+                                    : Image.asset(
+                                      'assets/profile.png',
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    ),
                           ),
                         ),
                       ),
@@ -313,10 +324,11 @@ class _ProfilePageState extends State<ProfilePage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => EditProfile(
-                                    uuid: widget.uuid,
-                                    accessToken: widget.accessToken,
-                                  ),
+                                  builder:
+                                      (context) => EditProfile(
+                                        uuid: widget.uuid,
+                                        accessToken: widget.accessToken,
+                                      ),
                                 ),
                               );
                             },
@@ -336,10 +348,11 @@ class _ProfilePageState extends State<ProfilePage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => GantiPassword(
-                                    uuid: widget.uuid,
-                                    accessToken: widget.accessToken,
-                                  ),
+                                  builder:
+                                      (context) => GantiPassword(
+                                        uuid: widget.uuid,
+                                        accessToken: widget.accessToken,
+                                      ),
                                 ),
                               );
                             },
@@ -388,7 +401,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              
                             ),
                           ),
                         ],

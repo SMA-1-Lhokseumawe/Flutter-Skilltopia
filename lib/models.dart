@@ -25,14 +25,14 @@ class User {
 class LoginResponse {
   final bool status;
   final String message;
-  final User? user;
+  final String? username;
   final String? accessToken;
   final String? uuid;
 
   LoginResponse({
     required this.status,
     required this.message,
-    this.user,
+    this.username,
     this.accessToken,
     this.uuid,
   });
@@ -43,7 +43,7 @@ class LoginResponse {
       status:
           true, // Karena server tidak mengembalikan status, set default ke true
       message: 'Login successful', // Anda bisa mengganti ini sesuai kebutuhan
-      user: User.fromJson(json), // Langsung menggunakan json untuk User
+      username: json['username'],
       accessToken:
           json['accessToken'], // Ambil accessToken langsung dari response
       uuid: json['uuid'], // Ambil uuid langsung dari response
@@ -52,7 +52,7 @@ class LoginResponse {
 
   // Konversi LoginResponse ke JSON
   Map<String, dynamic> toJson() {
-    return {'user': user?.toJson(), 'accessToken': accessToken, 'uuid': uuid};
+    return {'username': 'username', 'accessToken': accessToken, 'uuid': uuid};
   }
 }
 
@@ -280,7 +280,10 @@ class NilaiSoal {
 class NotifikasiModel {
   final int? id;
   final String? content;
-  final String? urlImageProfile;
+  final int? siswaId; // Tambahkan ini
+  final int? guruId; // Tambahkan ini
+  final Siswa? siswa; // Tambahkan ini
+  final Guru? guru; // Tambahkan ini
   bool? isRead;
   final int? postId;
   final String? createdAt;
@@ -288,7 +291,10 @@ class NotifikasiModel {
   NotifikasiModel({
     this.id,
     this.content,
-    this.urlImageProfile,
+    this.siswaId,
+    this.guruId,
+    this.siswa,
+    this.guru,
     this.isRead,
     this.postId,
     this.createdAt,
@@ -298,7 +304,10 @@ class NotifikasiModel {
     return NotifikasiModel(
       id: json['id'],
       content: json['content'],
-      urlImageProfile: json['urlImageProfile'],
+      siswaId: json['siswaId'],
+      guruId: json['guruId'],
+      siswa: json['siswa'] != null ? Siswa.fromJson(json['siswa']) : null,
+      guru: json['guru'] != null ? Guru.fromJson(json['guru']) : null,
       isRead: json['isRead'] ?? false,
       postId: json['postId'],
       createdAt: json['createdAt'],
@@ -309,11 +318,47 @@ class NotifikasiModel {
     return {
       'id': id,
       'content': content,
-      'urlImageProfile': urlImageProfile,
+      'siswaId': siswaId,
+      'guruId': guruId,
+      'siswa': siswa?.toJson(),
+      'guru': guru?.toJson(),
       'isRead': isRead,
       'postId': postId,
       'createdAt': createdAt,
     };
+  }
+}
+
+// Tambahkan model untuk Siswa dan Guru jika belum ada
+class Siswa {
+  final int? id;
+  final String? nama;
+  final String? url;
+
+  Siswa({this.id, this.nama, this.url});
+
+  factory Siswa.fromJson(Map<String, dynamic> json) {
+    return Siswa(id: json['id'], nama: json['nama'], url: json['url']);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'nama': nama, 'url': url};
+  }
+}
+
+class Guru {
+  final int? id;
+  final String? nama;
+  final String? url;
+
+  Guru({this.id, this.nama, this.url});
+
+  factory Guru.fromJson(Map<String, dynamic> json) {
+    return Guru(id: json['id'], nama: json['nama'], url: json['url']);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'nama': nama, 'url': url};
   }
 }
 
@@ -412,6 +457,143 @@ class SubModulModel {
       'content': content,
       'audio': audio,
       'video': video,
+    };
+  }
+}
+
+class DiskusiModel {
+  final int id;
+  final String judul;
+  final String content;
+  final List<String> kategori;
+  final int? siswaId;
+  final int? guruId;
+  final List<String> images;
+  final List<String> url;
+  final int userId;
+  final String createdAt;
+  final String updatedAt;
+  final User user;
+  final Siswa? siswa;
+  final Guru? guru;
+
+  DiskusiModel({
+    required this.id,
+    required this.judul,
+    required this.content,
+    required this.kategori,
+    this.siswaId,
+    this.guruId,
+    required this.images,
+    required this.url,
+    required this.userId,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.user,
+    this.siswa,
+    this.guru,
+  });
+
+  factory DiskusiModel.fromJson(Map<String, dynamic> json) {
+  return DiskusiModel(
+    id: json['id'] ?? 0,
+    judul: json['judul'] ?? '', // Add null check here
+    content: json['content'] ?? '',
+    kategori: json['kategori'] != null ? List<String>.from(json['kategori']) : [],
+    siswaId: json['siswaId'],
+    guruId: json['guruId'],
+    images: json['images'] != null ? List<String>.from(json['images']) : [],
+    url: json['url'] != null ? List<String>.from(json['url']) : [],
+    userId: json['userId'] ?? 0,
+    createdAt: json['createdAt'] ?? DateTime.now().toIso8601String(),
+    updatedAt: json['updatedAt'] ?? DateTime.now().toIso8601String(),
+    user: json['user'] != null ? User.fromJson(json['user']) : User(username: '', role: ''),
+    siswa: json['siswa'] != null ? Siswa.fromJson(json['siswa']) : null,
+    guru: json['guru'] != null ? Guru.fromJson(json['guru']) : null,
+  );
+}
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'judul': judul,
+      'content': content,
+      'kategori': kategori,
+      'siswaId': siswaId,
+      'guruId': guruId,
+      'images': images,
+      'url': url,
+      'userId': userId,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'user': user.toJson(),
+      'siswa': siswa?.toJson(),
+      'guru': guru?.toJson(),
+    };
+  }
+}
+
+class KomentarModel {
+  final int id;
+  final String content;
+  final int postId;
+  final int? siswaId;
+  final int? guruId;
+  final int userId;
+  final String createdAt;
+  final String updatedAt;
+  final User user;
+  final Siswa? siswa;
+  final Guru? guru;
+
+  KomentarModel({
+    required this.id,
+    required this.content,
+    required this.postId,
+    this.siswaId,
+    this.guruId,
+    required this.userId,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.user,
+    this.siswa,
+    this.guru,
+  });
+
+  factory KomentarModel.fromJson(Map<String, dynamic> json) {
+    return KomentarModel(
+      id: json['id'] ?? 0,
+      content: json['content'] ?? '',
+      postId: json['postId'] ?? 0,
+      siswaId: json['siswaId'],
+      guruId: json['guruId'],
+      userId: json['userId'] ?? 0,
+      createdAt: json['createdAt'] ?? '',
+      updatedAt: json['updatedAt'] ?? '',
+      user: json['user'] != null   
+        ? User.fromJson(json['user'])   
+        : User(
+            username: 'Unknown',   
+            email: ''  
+          ),  
+      siswa: json['siswa'] != null ? Siswa.fromJson(json['siswa']) : null,
+      guru: json['guru'] != null ? Guru.fromJson(json['guru']) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'content': content,
+      'postId': postId,
+      'siswaId': siswaId,
+      'guruId': guruId,
+      'userId': userId,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'user': user.toJson(),
+      'siswa': siswa?.toJson(),
+      'guru': guru?.toJson(),
     };
   }
 }

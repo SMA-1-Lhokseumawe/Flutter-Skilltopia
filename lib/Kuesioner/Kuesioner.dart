@@ -4,11 +4,13 @@ import 'HasilKuesioner.dart';
 class Kuesioner extends StatefulWidget {
   final String uuid;
   final String accessToken;
+  final String username;
 
   const Kuesioner({
     Key? key, 
     required this.uuid,
     required this.accessToken,
+    required this.username,
   }) : super(key: key);
 
   @override
@@ -341,6 +343,9 @@ class _KuesionerState extends State<Kuesioner> {
       context,
       MaterialPageRoute(
         builder: (context) => HasilKuesioner(
+          uuid: widget.uuid,
+          accessToken: widget.accessToken,
+          username: widget.username,
           visualCount: visualCount,
           auditoriCount: auditoriCount,
           kinestetikCount: kinestetikCount,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:skilltopia/Kuesioner/Kuesioner.dart';
 import 'package:skilltopia/Materi/ListSubModul.dart';
 import 'package:skilltopia/models.dart'; // Import model
 import 'package:skilltopia/repository.dart'; // Import repository
@@ -7,12 +8,14 @@ class ListModul extends StatefulWidget {
   final String uuid;
   final String accessToken;
   final String gayaBelajar;
+  final String username;
 
   const ListModul({
     Key? key,
     required this.uuid,
     required this.accessToken,
     required this.gayaBelajar,
+    required this.username,
   }) : super(key: key);
 
   @override
@@ -25,11 +28,21 @@ class _ListModulState extends State<ListModul> {
   bool _isLoading = true;
   String _errorMessage = '';
   String _searchQuery = '';
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchModules();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (widget.gayaBelajar == null || widget.gayaBelajar.isEmpty) {
+      // Use Future.microtask to schedule the dialog after the current build cycle
+      Future.microtask(() => _showIfGayaBelajarNull());
+    } else {
+      _fetchModules();
+    }
   }
 
   Future<void> _fetchModules() async {
@@ -52,6 +65,61 @@ class _ListModulState extends State<ListModul> {
         _isLoading = false;
       });
     }
+  }
+
+  void _showIfGayaBelajarNull() {
+    setState(() {
+      isLoading = false;
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User must tap a button to dismiss
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFF27DEBF)),
+              SizedBox(width: 10),
+              Text('Pemberitahuan'),
+            ],
+          ),
+          content: Text(
+            'Gaya Belajar Anda belum dibuat. Silakan isi kuesioner untuk melanjutkan.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('KEMBALI', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                Navigator.pop(context);
+              },
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF27DEBF),
+              ),
+              child: Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                // Navigate to Kuesioner
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => Kuesioner(
+                          uuid: widget.uuid,
+                          accessToken: widget.accessToken,
+                          username: widget.username,
+                        ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

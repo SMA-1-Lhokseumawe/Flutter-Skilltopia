@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:skilltopia/Beranda/beranda.dart';
+import 'package:skilltopia/repository.dart';
 
 class HasilKuesioner extends StatefulWidget {
+  final String uuid;
+  final String accessToken;
+  final String username;
   final int visualCount;
   final int auditoriCount;
   final int kinestetikCount;
@@ -8,6 +13,9 @@ class HasilKuesioner extends StatefulWidget {
 
   const HasilKuesioner({
     super.key,
+    required this.uuid,
+    required this.accessToken,
+    required this.username,
     required this.visualCount,
     required this.auditoriCount,
     required this.kinestetikCount,
@@ -21,36 +29,173 @@ class HasilKuesioner extends StatefulWidget {
 class _HasilKuesionerState extends State<HasilKuesioner> {
   // App main color
   final Color primaryColor = Color(0xFF27DEBF);
-  
+
   // Define colors for each learning style
   final Color visualColor = Color(0xFF5C7AEA);
   final Color auditoriColor = Color(0xFFFFA41B);
   final Color kinestetikColor = Color(0xFF4E9F3D);
-  
+
+  late int siswaId;
+  bool isLoading = true;
+
   // Calculate percentages for each learning style
-  int get visualPercentage => (widget.visualCount / widget.totalQuestions * 100).round();
-  int get auditoriPercentage => (widget.auditoriCount / widget.totalQuestions * 100).round();
-  int get kinestetikPercentage => (widget.kinestetikCount / widget.totalQuestions * 100).round();
-  
+  int get visualPercentage =>
+      (widget.visualCount / widget.totalQuestions * 100).round();
+  int get auditoriPercentage =>
+      (widget.auditoriCount / widget.totalQuestions * 100).round();
+  int get kinestetikPercentage =>
+      (widget.kinestetikCount / widget.totalQuestions * 100).round();
+
   // Determine the dominant learning style
   String get dominantLearningStyle {
-    if (widget.visualCount >= widget.auditoriCount && widget.visualCount >= widget.kinestetikCount) {
+    if (widget.visualCount >= widget.auditoriCount &&
+        widget.visualCount >= widget.kinestetikCount) {
       return "Visual";
-    } else if (widget.auditoriCount >= widget.visualCount && widget.auditoriCount >= widget.kinestetikCount) {
+    } else if (widget.auditoriCount >= widget.visualCount &&
+        widget.auditoriCount >= widget.kinestetikCount) {
       return "Auditori";
     } else {
       return "Kinestetik";
     }
   }
-  
+
   // Get the color associated with the dominant style
   Color get dominantColor {
-    return dominantLearningStyle == "Visual" 
-        ? visualColor 
-        : dominantLearningStyle == "Auditori" 
-            ? auditoriColor 
-            : kinestetikColor;
+    return dominantLearningStyle == "Visual"
+        ? visualColor
+        : dominantLearningStyle == "Auditori"
+        ? auditoriColor
+        : kinestetikColor;
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final repository = UserRepository();
+      final response = await repository.getProfile(widget.accessToken);
+
+      if (response['status']) {
+        final data = response['data'];
+
+          setState(() {
+            siswaId = data['id'] ?? '';
+            isLoading = false;
+          });
+        }
+    } catch (error) {
+      setState(() {
+        isLoading = false;
+      });
+      // Show error message but don't show the dialog
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error fetching profile: $error")));
+    }
+  }
+
+  // Function to update learning style in the user profile
+Future<void> _updateLearningStyle() async {
+  if (isLoading) {
+    // If still loading profile data, show a message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Mohon tunggu, sedang memuat data profil...'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+    return;
+  }
+
+  try {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: CircularProgressIndicator(
+            color: primaryColor,
+          ),
+        );
+      },
+    );
+
+    // Create repository instance
+    final userRepository = UserRepository();
+
+    // Prepare learning style data
+    final Map<String, dynamic> learningStyleData = {
+      'gayaBelajar': dominantLearningStyle,
+      'persentaseVisual': visualPercentage,
+      'persentaseAuditori': auditoriPercentage,
+      'persentaseKinestetik': kinestetikPercentage,
+    };
+
+    // Call update profile method
+    final result = await userRepository.updateProfile(
+      accessToken: widget.accessToken,
+      id: siswaId,
+      profileData: learningStyleData,
+    );
+
+    // Dismiss loading indicator
+    Navigator.pop(context);
+
+    // Show appropriate message based on the result
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['status'] 
+              ? 'Gaya belajar berhasil disimpan!' 
+              : 'Gagal menyimpan gaya belajar: ${result['message']}',
+        ),
+        backgroundColor: result['status'] ? Colors.green : Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+
+    // If successful, navigate back to Beranda
+    if (result['status']) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Beranda(
+            uuid: widget.uuid,
+            accessToken: widget.accessToken,
+            username: widget.username,
+          ),
+        ),
+      );
+    }
+  } catch (e) {
+    // Dismiss loading indicator if it's still showing
+    Navigator.of(context, rootNavigator: true).pop();
+    
+    // Show error message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Terjadi kesalahan: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +241,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
               ),
             ),
           ),
-          
+
           // Main content
           SafeArea(
             child: SingleChildScrollView(
@@ -107,20 +252,20 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
                   children: [
                     // Trophy icon
                     _buildTrophySection(),
-                    
+
                     // Learning style result card
                     _buildResultCard(),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Distribution chart card
                     _buildDistributionCard(),
-                    
+
                     const SizedBox(height: 30),
-                    
+
                     // Button to retake test
-                    _buildRetakeButton(),
-                  ],
+                    _buildButtonSave()
+                  ]
                 ),
               ),
             ),
@@ -140,11 +285,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
         color: dominantColor.withOpacity(0.1),
         shape: BoxShape.circle,
       ),
-      child: Icon(
-        Icons.emoji_events_rounded,
-        size: 70,
-        color: dominantColor,
-      ),
+      child: Icon(Icons.emoji_events_rounded, size: 70, color: dominantColor),
     );
   }
 
@@ -163,10 +304,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
             offset: Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: dominantColor.withOpacity(0.15),
-          width: 1,
-        ),
+        border: Border.all(color: dominantColor.withOpacity(0.15), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -181,7 +319,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Learning style name with gradient background
             Container(
               padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -222,7 +360,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Learning style icon
             Container(
               padding: EdgeInsets.all(12),
@@ -231,17 +369,17 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                dominantLearningStyle == "Visual" 
+                dominantLearningStyle == "Visual"
                     ? Icons.visibility
-                    : dominantLearningStyle == "Auditori" 
-                        ? Icons.hearing 
-                        : Icons.directions_run,
+                    : dominantLearningStyle == "Auditori"
+                    ? Icons.hearing
+                    : Icons.directions_run,
                 color: dominantColor,
                 size: 36,
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Description based on dominant style
             Text(
               _getLearningStyleDescription(dominantLearningStyle),
@@ -274,10 +412,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
             offset: Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: primaryColor.withOpacity(0.15),
-          width: 1,
-        ),
+        border: Border.all(color: primaryColor.withOpacity(0.15), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -312,7 +447,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Visual percentage
             _buildLearningStylePercentage(
               label: 'Visual',
@@ -321,7 +456,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
               icon: Icons.visibility,
             ),
             const SizedBox(height: 20),
-            
+
             // Auditori percentage
             _buildLearningStylePercentage(
               label: 'Auditori',
@@ -330,7 +465,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
               icon: Icons.hearing,
             ),
             const SizedBox(height: 20),
-            
+
             // Kinestetik percentage
             _buildLearningStylePercentage(
               label: 'Kinestetik',
@@ -343,17 +478,17 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
       ),
     );
   }
-  
+
   // Button to retake the questionnaire
-  Widget _buildRetakeButton() {
+  Widget _buildButtonSave() {
     return Container(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {
-          Navigator.pop(context);
+          _updateLearningStyle();
         },
         icon: Icon(Icons.refresh_rounded),
-        label: Text('Mengisi Kembali Kuesioner'),
+        label: Text('Kembali'),
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
@@ -385,10 +520,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
       child: Row(
         children: [
@@ -408,14 +540,10 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
                 ),
               ],
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 16),
-          
+
           // Label and progress bar
           Expanded(
             child: Column(
@@ -446,7 +574,7 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                
+
                 // Custom progress bar
                 Stack(
                   children: [
@@ -462,14 +590,13 @@ class _HasilKuesionerState extends State<HasilKuesioner> {
                     // Foreground
                     Container(
                       height: 10,
-                      width: MediaQuery.of(context).size.width * 
-                          (percentage / 100) * 0.6, // Adjust width based on screen size
+                      width:
+                          MediaQuery.of(context).size.width *
+                          (percentage / 100) *
+                          0.6, // Adjust width based on screen size
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            color,
-                            color.withOpacity(0.8),
-                          ],
+                          colors: [color, color.withOpacity(0.8)],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
