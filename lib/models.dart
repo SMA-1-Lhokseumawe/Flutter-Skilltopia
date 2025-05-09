@@ -364,7 +364,7 @@ class Guru {
 
 class ModulModel {
   final int id;
-  final String? judul;
+  final String judul;
   final String? deskripsi;
   final String? durasi;
   final int? kelasId;
@@ -376,7 +376,7 @@ class ModulModel {
 
   ModulModel({
     required this.id,
-    this.judul,
+    required this.judul,
     this.deskripsi,
     this.durasi,
     this.kelasId,

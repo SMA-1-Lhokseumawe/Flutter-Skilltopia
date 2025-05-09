@@ -5,11 +5,13 @@ import 'package:skilltopia/repository.dart';
 
 class ListSubModul extends StatefulWidget {
   final int modulId;
+  final String judul;
   final String accessToken;
 
   const ListSubModul({
     Key? key,
     required this.modulId,
+    required this.judul,
     required this.accessToken,
   }) : super(key: key);
 
@@ -64,7 +66,7 @@ class _ListSubModulState extends State<ListSubModul> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Pythagoras',
+          widget.judul,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,

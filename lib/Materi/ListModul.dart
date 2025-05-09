@@ -382,6 +382,7 @@ class _ListModulState extends State<ListModul> {
                                         (context) => ListSubModul(
                                           modulId: module.id,
                                           accessToken: widget.accessToken,
+                                          judul: module.judul,
                                         ),
                                   ),
                                 );
